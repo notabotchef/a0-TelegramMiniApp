@@ -15,34 +15,33 @@ Output capped at 50 000 chars combined.
 
 import json
 import os
+import re
 import subprocess
 import time
 from typing import Any
 
-# Patterns that must not appear in submitted commands (substring match, case-insensitive)
-_BLOCKLIST = [
-    "rm -rf /",
-    "rm -rf /*",
-    ":(){ :|:& };:",          # fork bomb
-    "mkfs",
-    "dd if=",
-    "dd if =",
-    "> /dev/sd",
-    "shutdown",
-    "reboot",
-    "halt",
-    "poweroff",
-    "init 0",
-    "init 6",
-]
+# Regex patterns that must not match the command (case-insensitive)
+# Each entry is a compiled regex applied to the lowercased command.
+_BLOCKLIST_RE = [re.compile(p, re.IGNORECASE) for p in [
+    r'rm\s+-rf\s+/\s*$',           # rm -rf /   (root only, not subdirs)
+    r'rm\s+-rf\s+/\*',             # rm -rf /*
+    r':\(\)\s*\{',                  # fork bomb: :(){
+    r'\bmkfs\b',
+    r'\bdd\s+if\s*=',
+    r'>\s*/dev/sd',
+    r'\bshutdown\b',
+    r'\breboot\b',
+    r'\bhalt\b',
+    r'\bpoweroff\b',
+    r'\binit\s+[06]\b',
+]]
 
 _MAX_OUTPUT = 50_000   # chars
 _TIMEOUT    = 30       # seconds
 
 
 def _is_blocked(cmd: str) -> bool:
-    low = cmd.lower()
-    return any(pattern.lower() in low for pattern in _BLOCKLIST)
+    return any(p.search(cmd) for p in _BLOCKLIST_RE)
 
 
 def _json_response(data: dict, status: int = 200) -> Any:
