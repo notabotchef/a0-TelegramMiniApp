@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Agent Zero</title>
+<script src="https://telegram.org/js/telegram-web-app.js?62"></script>
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js" defer></script>
+<style>
+/* ─── CSS VARIABLES ──────────────────────────────────────────────────────── */
+:root {
+  --bg:         var(--tg-theme-bg-color,            #0d0d0d);
+  --text:       var(--tg-theme-text-color,          #e5e5e5);
+  --hint:       var(--tg-theme-hint-color,          #666);
+  --btn:        var(--tg-theme-button-color,        #22c55e);
+  --btn-text:   var(--tg-theme-button-text-color,   #0d0d0d);
+  --sec-bg:     var(--tg-theme-secondary-bg-color,  #111);
+  --hdr-bg:     var(--tg-theme-header_bg_color,     #0a0a0a);
+  --destructive:var(--tg-theme-destructive_text_color, #ef4444);
+  --accent:     #22c55e;
+  --border:     rgba(255,255,255,.08);
+  --safe-top:   var(--tg-safe-area-inset-top,    0px);
+  --safe-bottom:var(--tg-safe-area-inset-bottom, 0px);
+  --header-h:   calc(var(--safe-top) + 48px);
+  --tab-h:      52px;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; overflow: hidden; }
+body {
+  font-family: 'SF Mono','Fira Code','Cascadia Code','Menlo',monospace;
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ─── HEADER ─────────────────────────────────────────────────────────────── */
+#app-header {
+  display: none;                     /* hidden until app shown */
+  align-items: center;
+  justify-content: space-between;
+  height: var(--header-h);
+  padding: calc(var(--safe-top) + 8px) 16px 8px;
+  background: var(--hdr-bg);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  z-index: 10;
+}
+.header-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: .2px;
+}
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+#conn-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: #555;
+  transition: background .3s;
+  flex-shrink: 0;
+}
+#conn-dot.online  { background: var(--accent); }
+#conn-dot.offline { background: var(--destructive); }
+#tunnel-badge {
+  display: none;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 12px;
+  background: rgba(34,197,94,.15);
+  color: var(--accent);
+  border: 1px solid rgba(34,197,94,.3);
+  letter-spacing: .3px;
+  text-transform: uppercase;
+}
+
+/* ─── TAB BAR ────────────────────────────────────────────────────────────── */
+#tab-bar {
+  display: none;                     /* hidden until app shown */
+  align-items: stretch;
+  height: var(--tab-h);
+  background: var(--hdr-bg);
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+  z-index: 10;
+  order: 99;                         /* pushed to bottom via flex */
+}
+.tab-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--hint);
+  transition: color .15s;
+  padding: 6px 4px calc(var(--safe-bottom) + 6px);
+  -webkit-tap-highlight-color: transparent;
+}
+.tab-btn.active { color: var(--accent); }
+.tab-icon { font-size: 18px; line-height: 1; }
+.tab-label { font-size: 9px; font-weight: 600; letter-spacing: .3px; text-transform: uppercase; }
+
+/* ─── PANELS ─────────────────────────────────────────────────────────────── */
+#app-panel {
+  display: none;
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+.panel {
+  display: none;
+  height: 100%;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 16px;
+}
+.panel.active { display: block; }
+.panel::-webkit-scrollbar { width: 2px; }
+.panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,.08); border-radius: 2px; }
+
+/* placeholder content */
+.panel-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 8px;
+  color: var(--hint);
+}
+.panel-placeholder .p-icon { font-size: 36px; opacity: .4; }
+.panel-placeholder .p-label { font-size: 12px; letter-spacing: .5px; text-transform: uppercase; opacity: .4; }
+
+/* ─── SETUP PANEL ────────────────────────────────────────────────────────── */
+#setup-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  padding: 32px 24px calc(var(--safe-bottom) + 32px);
+  gap: 0;
+}
+
+/* Logo mark */
+.setup-logo {
+  margin-bottom: 20px;
+}
+.setup-logo svg {
+  display: block;
+}
+
+.setup-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 6px;
+  text-align: center;
+  letter-spacing: -.2px;
+}
+.setup-subtitle {
+  font-size: 12px;
+  color: var(--hint);
+  text-align: center;
+  margin-bottom: 28px;
+  line-height: 1.6;
+  max-width: 280px;
+}
+
+.setup-field {
+  width: 100%;
+  max-width: 320px;
+  margin-bottom: 10px;
+}
+.setup-field label {
+  display: block;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--hint);
+  letter-spacing: .6px;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+.setup-field input {
+  width: 100%;
+  background: var(--sec-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 13px 16px;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 14px;
+  outline: none;
+  transition: border-color .15s;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.setup-field input::placeholder { color: var(--hint); }
+.setup-field input:focus { border-color: var(--accent); }
+.setup-field input.error { border-color: var(--destructive); }
+
+.setup-hint {
+  width: 100%;
+  max-width: 320px;
+  font-size: 11px;
+  color: var(--hint);
+  line-height: 1.5;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+.setup-hint::before {
+  content: "🔐";
+  font-size: 12px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+#setup-error {
+  display: none;
+  width: 100%;
+  max-width: 320px;
+  font-size: 12px;
+  color: var(--destructive);
+  background: rgba(239,68,68,.08);
+  border: 1px solid rgba(239,68,68,.2);
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  line-height: 1.5;
+}
+
+#connect-btn {
+  width: 100%;
+  max-width: 320px;
+  height: 50px;
+  background: var(--accent);
+  color: var(--btn-text);
+  border: none;
+  border-radius: 14px;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity .15s, transform .1s;
+  -webkit-tap-highlight-color: transparent;
+}
+#connect-btn:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+#connect-btn:not(:disabled):active {
+  transform: scale(.97);
+}
+
+.setup-footer {
+  margin-top: 24px;
+  font-size: 11px;
+  color: var(--hint);
+  text-align: center;
+}
+.setup-footer a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+/* ─── NOT-TELEGRAM GATE ──────────────────────────────────────────────────── */
+#tg-gate {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  padding: 32px 24px;
+  gap: 12px;
+  text-align: center;
+}
+#tg-gate .gate-icon { font-size: 48px; }
+#tg-gate .gate-title { font-size: 18px; font-weight: 700; color: var(--text); }
+#tg-gate .gate-msg { font-size: 13px; color: var(--hint); line-height: 1.6; max-width: 280px; }
+
+/* ─── LOADING OVERLAY ────────────────────────────────────────────────────── */
+#loading-overlay {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  gap: 16px;
+}
+.spinner {
+  width: 32px; height: 32px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-label {
+  font-size: 12px;
+  color: var(--hint);
+  letter-spacing: .4px;
+}
+</style>
+</head>
+<body>
+
+<!-- ─── NOT-TELEGRAM GATE ─────────────────────────────────────────────────── -->
+<div id="tg-gate">
+  <div class="gate-icon">✈️</div>
+  <div class="gate-title">Open from Telegram</div>
+  <div class="gate-msg">This Mini App must be opened inside Telegram. Tap the menu button in your Agent Zero bot to launch it.</div>
+</div>
+
+<!-- ─── LOADING OVERLAY ───────────────────────────────────────────────────── -->
+<div id="loading-overlay">
+  <div class="spinner"></div>
+  <div class="loading-label" id="loading-label">Connecting…</div>
+</div>
+
+<!-- ─── SETUP PANEL ───────────────────────────────────────────────────────── -->
+<div id="setup-panel" style="display:none">
+  <div class="setup-logo">
+    <!-- A0 logo: green hexagon with "A0" -->
+    <svg width="64" height="72" viewBox="0 0 64 72" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M32 2 L61 18 L61 54 L32 70 L3 54 L3 18 Z"
+            fill="rgba(34,197,94,.12)"
+            stroke="#22c55e"
+            stroke-width="1.5"/>
+      <text x="32" y="44"
+            text-anchor="middle"
+            font-family="SF Mono,Fira Code,Menlo,monospace"
+            font-size="20"
+            font-weight="700"
+            fill="#22c55e">A0</text>
+    </svg>
+  </div>
+
+  <div class="setup-title">Agent Zero</div>
+  <div class="setup-subtitle">Enter your Agent Zero instance URL to get started.</div>
+
+  <div class="setup-field">
+    <label for="url-input">Agent Zero URL</label>
+    <input id="url-input"
+           type="url"
+           placeholder="https://your-agent-zero.com"
+           autocomplete="off"
+           autocorrect="off"
+           autocapitalize="none"
+           spellcheck="false">
+  </div>
+
+  <div class="setup-hint">
+    No API key needed — your Telegram identity authenticates you automatically.
+  </div>
+
+  <div id="setup-error"></div>
+
+  <button id="connect-btn" disabled>Connect</button>
+
+  <div class="setup-footer">
+    Need help? See the <a href="https://github.com/yourusername/agent0-telegram-miniapp#readme" target="_blank" rel="noopener">setup guide</a>.
+  </div>
+</div>
+
+<!-- ─── HEADER (shown after auth) ─────────────────────────────────────────── -->
+<div id="app-header">
+  <div class="header-title">Agent Zero</div>
+  <div class="header-right">
+    <span id="tunnel-badge">TUNNEL</span>
+    <span id="conn-dot"></span>
+  </div>
+</div>
+
+<!-- ─── MAIN APP PANEL ────────────────────────────────────────────────────── -->
+<div id="app-panel">
+
+  <!-- Feed Tab ⚡ -->
+  <div id="feed-panel" class="panel active">
+    <div class="panel-placeholder">
+      <div class="p-icon">⚡</div>
+      <div class="p-label">Feed — coming in Phase 2</div>
+    </div>
+  </div>
+
+  <!-- Config Tab ⚙ -->
+  <div id="config-panel" class="panel">
+    <div class="panel-placeholder">
+      <div class="p-icon">⚙️</div>
+      <div class="p-label">Config — coming in Phase 3</div>
+    </div>
+  </div>
+
+  <!-- Manage Tab 💬 -->
+  <div id="manage-panel" class="panel">
+    <div class="panel-placeholder">
+      <div class="p-icon">💬</div>
+      <div class="p-label">Manage — coming in Phase 4</div>
+    </div>
+  </div>
+
+  <!-- Shell Tab >_ -->
+  <div id="shell-panel" class="panel">
+    <div class="panel-placeholder">
+      <div class="p-icon">&gt;_</div>
+      <div class="p-label">Shell — coming in Phase 5</div>
+    </div>
+  </div>
+
+</div><!-- /#app-panel -->
+
+<!-- ─── TAB BAR ───────────────────────────────────────────────────────────── -->
+<div id="tab-bar">
+  <button class="tab-btn active" data-tab="feed"   onclick="switchTab('feed')">
+    <span class="tab-icon">⚡</span>
+    <span class="tab-label">Feed</span>
+  </button>
+  <button class="tab-btn"        data-tab="config" onclick="switchTab('config')">
+    <span class="tab-icon">⚙️</span>
+    <span class="tab-label">Config</span>
+  </button>
+  <button class="tab-btn"        data-tab="manage" onclick="switchTab('manage')">
+    <span class="tab-icon">💬</span>
+    <span class="tab-label">Manage</span>
+  </button>
+  <button class="tab-btn"        data-tab="shell"  onclick="switchTab('shell')">
+    <span class="tab-icon">&gt;_</span>
+    <span class="tab-label">Shell</span>
+  </button>
+</div>
+
+<script>
+'use strict';
+
+// ─── GLOBALS ────────────────────────────────────────────────────────────────
+const WebApp = window.Telegram?.WebApp;
+const CS     = WebApp?.CloudStorage;
+
+let baseUrl = '';    // e.g. "https://my-agent-zero.com" (no trailing slash)
+let apiKey  = '';    // received from /api/plugins/_miniapp/auth
+let activeTab = 'feed';
+
+// ─── STORAGE HELPERS ────────────────────────────────────────────────────────
+async function csGet(key) {
+  if (CS) {
+    try {
+      return await new Promise((res, rej) =>
+        CS.getItem(key, (err, val) => err ? rej(err) : res(val))
+      );
+    } catch (_) {}
+  }
+  try { return localStorage.getItem(key); } catch (_) { return null; }
+}
+
+async function csSet(key, value) {
+  if (CS) {
+    try {
+      await new Promise((res, rej) =>
+        CS.setItem(key, value, (err) => err ? rej(err) : res())
+      );
+      return;
+    } catch (_) {}
+  }
+  try { localStorage.setItem(key, value); } catch (_) {}
+}
+
+// ─── CONFIG ─────────────────────────────────────────────────────────────────
+async function loadConfig() {
+  const url = await csGet('a0_base_url');
+  const key = await csGet('a0_api_key');
+  if (url) baseUrl = url.replace(/\/+$/, '');
+  if (key) apiKey = key;
+  return url ? { baseUrl, apiKey } : null;
+}
+
+async function saveConfig(url, key) {
+  baseUrl = url.replace(/\/+$/, '');
+  apiKey  = key || '';
+  await csSet('a0_base_url', baseUrl);
+  if (key) await csSet('a0_api_key', apiKey);
+}
+
+// ─── FETCH HELPERS ──────────────────────────────────────────────────────────
+function fetchWithTimeout(url, opts = {}, timeoutMs = 15000) {
+  const controller = new AbortController();
+  const tid = setTimeout(() => controller.abort(), timeoutMs);
+  return fetch(url, { ...opts, signal: controller.signal })
+    .finally(() => clearTimeout(tid));
+}
+
+async function testConnection(url) {
+  try {
+    const r = await fetchWithTimeout(
+      url.replace(/\/+$/, '') + '/api/health',
+      {},
+      4000
+    );
+    if (r.ok) return { ok: true };
+    return { ok: false, error: `Server returned ${r.status}` };
+  } catch (e) {
+    if (e.name === 'AbortError') {
+      return { ok: false, error: 'Cannot reach Agent Zero — request timed out. Check the URL and that ALLOWED_ORIGINS is set on the server.' };
+    }
+    return { ok: false, error: 'Cannot reach Agent Zero. Check the URL and that ALLOWED_ORIGINS includes https://web.telegram.org.' };
+  }
+}
+
+async function doHandshake() {
+  try {
+    const initData = WebApp?.initData;
+    if (!initData) return { ok: false, error: 'No Telegram initData available' };
+
+    const r = await fetchWithTimeout(
+      baseUrl + '/api/plugins/_miniapp/auth',
+      {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ init_data: initData }),
+        // initData is discarded after this call — never stored
+      },
+      10000
+    );
+
+    const data = await r.json().catch(() => ({}));
+
+    if (r.status === 200 && data.api_key) {
+      return { ok: true, api_key: data.api_key };
+    }
+    if (r.status === 401) {
+      return { ok: false, error: 'Auth failed — is the Telegram plugin active with your bot?' };
+    }
+    if (r.status === 503) {
+      return { ok: false, error: data.error || 'Telegram plugin not found. Enable it in Agent Zero settings.' };
+    }
+    if (r.status === 500) {
+      return { ok: false, error: data.error || 'Agent Zero API key not configured. Set it in A0 settings.' };
+    }
+    return { ok: false, error: data.error || `Unexpected response (${r.status})` };
+  } catch (e) {
+    if (e.name === 'AbortError') return { ok: false, error: 'Auth request timed out.' };
+    return { ok: false, error: e.message || 'Auth request failed' };
+  }
+}
+
+// ─── API HELPER ─────────────────────────────────────────────────────────────
+async function api(path, opts = {}) {
+  const headers = {
+    'Content-Type': 'application/json',
+    'X-API-KEY':    apiKey,
+    ...(opts.headers || {}),
+  };
+  const r = await fetchWithTimeout(
+    baseUrl + path,
+    {
+      method:  opts.method || 'POST',
+      headers,
+      body:    opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
+    },
+    opts.timeout || 15000
+  );
+  if (!r.ok) {
+    const msg = await r.text().catch(() => '');
+    throw new Error(`${r.status}: ${msg || r.statusText}`);
+  }
+  return r.json().catch(() => null);
+}
+
+// ─── TAB SWITCHING ──────────────────────────────────────────────────────────
+function switchTab(name) {
+  if (activeTab === name) return;
+  activeTab = name;
+
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.tab === name);
+  });
+  document.querySelectorAll('.panel').forEach(p => {
+    p.classList.toggle('active', p.id === name + '-panel');
+  });
+
+  WebApp?.HapticFeedback?.selectionChanged();
+}
+
+// ─── UI STATE TRANSITIONS ────────────────────────────────────────────────────
+function setLoading(label = 'Connecting…') {
+  document.getElementById('loading-overlay').style.display = 'flex';
+  document.getElementById('loading-label').textContent     = label;
+  document.getElementById('setup-panel').style.display     = 'none';
+  document.getElementById('tg-gate').style.display         = 'none';
+  document.getElementById('app-header').style.display      = 'none';
+  document.getElementById('app-panel').style.display       = 'none';
+  document.getElementById('tab-bar').style.display         = 'none';
+}
+
+function showSetup(errorMsg) {
+  document.getElementById('loading-overlay').style.display = 'none';
+  document.getElementById('tg-gate').style.display         = 'none';
+  document.getElementById('setup-panel').style.display     = 'flex';
+  document.getElementById('app-header').style.display      = 'none';
+  document.getElementById('app-panel').style.display       = 'none';
+  document.getElementById('tab-bar').style.display         = 'none';
+
+  if (errorMsg) setSetupError(errorMsg);
+}
+
+function showApp() {
+  document.getElementById('loading-overlay').style.display = 'none';
+  document.getElementById('setup-panel').style.display     = 'none';
+  document.getElementById('tg-gate').style.display         = 'none';
+  document.getElementById('app-header').style.display      = 'flex';
+  document.getElementById('app-panel').style.display       = 'block';
+  document.getElementById('tab-bar').style.display         = 'flex';
+}
+
+function showTgGate() {
+  document.getElementById('loading-overlay').style.display = 'none';
+  document.getElementById('setup-panel').style.display     = 'none';
+  document.getElementById('tg-gate').style.display         = 'flex';
+  document.getElementById('app-header').style.display      = 'none';
+  document.getElementById('app-panel').style.display       = 'none';
+  document.getElementById('tab-bar').style.display         = 'none';
+}
+
+function setSetupError(msg) {
+  const el = document.getElementById('setup-error');
+  if (msg) {
+    el.textContent = msg;
+    el.style.display = 'block';
+    document.getElementById('url-input').classList.add('error');
+  } else {
+    el.style.display = 'none';
+    document.getElementById('url-input').classList.remove('error');
+  }
+}
+
+function setConnDot(state) {
+  // state: 'online' | 'offline' | 'checking'
+  const dot = document.getElementById('conn-dot');
+  dot.className = '';
+  if (state === 'online')  dot.classList.add('online');
+  if (state === 'offline') dot.classList.add('offline');
+}
+
+// ─── SETUP SCREEN LOGIC ─────────────────────────────────────────────────────
+const urlInput   = document.getElementById('url-input');
+const connectBtn = document.getElementById('connect-btn');
+
+urlInput.addEventListener('input', () => {
+  setSetupError('');
+  connectBtn.disabled = !urlInput.value.trim();
+});
+
+urlInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !connectBtn.disabled) connectBtn.click();
+});
+
+connectBtn.addEventListener('click', async () => {
+  const rawUrl = urlInput.value.trim();
+  if (!rawUrl) return;
+
+  setSetupError('');
+  connectBtn.disabled = true;
+  connectBtn.textContent = 'Connecting…';
+
+  const health = await testConnection(rawUrl);
+  if (!health.ok) {
+    connectBtn.disabled  = false;
+    connectBtn.textContent = 'Connect';
+    setSetupError(health.error);
+    return;
+  }
+
+  // Temporarily set baseUrl for handshake
+  baseUrl = rawUrl.replace(/\/+$/, '');
+  const hs = await doHandshake();
+  if (!hs.ok) {
+    connectBtn.disabled  = false;
+    connectBtn.textContent = 'Connect';
+    setSetupError(hs.error);
+    return;
+  }
+
+  await saveConfig(rawUrl, hs.api_key);
+  setConnDot('online');
+  showApp();
+  WebApp?.HapticFeedback?.notificationOccurred('success');
+});
+
+// ─── INIT ────────────────────────────────────────────────────────────────────
+(async function init() {
+  if (WebApp) {
+    WebApp.ready();
+    WebApp.expand();
+  }
+
+  // Must be inside Telegram to use initData auth
+  const isTelegram = !!(WebApp?.initData);
+  if (!isTelegram) {
+    showTgGate();
+    return;
+  }
+
+  setLoading('Connecting…');
+
+  // Try to restore saved config
+  const cfg = await loadConfig();
+
+  if (!cfg || !cfg.baseUrl) {
+    // First run — show setup screen
+    showSetup();
+    return;
+  }
+
+  // Config exists — test connection, then re-run handshake (token may have changed)
+  setLoading('Checking connection…');
+  const health = await testConnection(cfg.baseUrl);
+  if (!health.ok) {
+    showSetup('Lost connection to Agent Zero. ' + health.error);
+    return;
+  }
+
+  setLoading('Authenticating…');
+  const hs = await doHandshake();
+  if (!hs.ok) {
+    // Auth failed — may just need a fresh token; show setup with prefilled URL
+    urlInput.value = cfg.baseUrl;
+    connectBtn.disabled = false;
+    showSetup(hs.error);
+    return;
+  }
+
+  // Refresh stored api_key in case it changed
+  await saveConfig(cfg.baseUrl, hs.api_key);
+  setConnDot('online');
+  showApp();
+})();
+</script>
+</body>
+</html>

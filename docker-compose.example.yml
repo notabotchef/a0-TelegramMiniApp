@@ -1,0 +1,34 @@
+version: "3.9"
+
+# Agent Zero + Telegram Mini App plugin
+# Copy this file to docker-compose.yml and fill in the values.
+#
+# REQUIRED:
+#   1. Set ALLOWED_ORIGINS to include https://web.telegram.org
+#   2. Mount the _miniapp plugin directory
+#   3. Ensure your Telegram bot is configured in Agent Zero settings
+#      (_telegram_integration plugin) before opening the Mini App.
+
+services:
+  agent-zero:
+    image: frdel/agent-zero-run:latest   # or your custom A0 image
+    container_name: agent-zero
+    restart: unless-stopped
+    ports:
+      - "50080:80"
+    environment:
+      # Allow requests from Telegram WebView origins
+      ALLOWED_ORIGINS: "https://web.telegram.org,https://telegram.org"
+    volumes:
+      # Mount the miniapp plugin into Agent Zero's user plugins directory
+      - ./a0-plugin/_miniapp:/a0/usr/plugins/_miniapp
+      # Optional: persist A0 data/settings between restarts
+      # - ./a0-data:/a0/data
+
+# After starting:
+#   1. Open Agent Zero at http://localhost:50080
+#   2. Enable the _telegram_integration plugin and add your bot token
+#   3. Note your tunnel URL (e.g. from A0's built-in tunnel or cloudflared)
+#   4. Set the Mini App URL in BotFather:
+#      /setmenubutton → your bot → https://<your-tunnel-url>/index.html
+#   5. Open the Mini App in Telegram — enter the tunnel URL when prompted

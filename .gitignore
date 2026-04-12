@@ -1,0 +1,21 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets / local overrides
+docker-compose.yml
+.env
+.env.local
+*.key
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Runtime data (if A0 data dir is ever mounted here)
+a0-data/
+
+# Node (if any tooling is added later)
+node_modules/
