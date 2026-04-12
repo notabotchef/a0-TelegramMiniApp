@@ -373,6 +373,109 @@ body {
   50%      { opacity: .3; }
 }
 
+/* ─── CONFIG TAB ────────────────────────────────────────────────────────────── */
+#config-panel { padding: 0; }
+.panel-scroll { overflow-y: auto; height: 100%; -webkit-overflow-scrolling: touch; }
+.panel-scroll::-webkit-scrollbar { width: 2px; }
+.panel-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,.08); }
+
+.section {
+  margin: 12px; border-radius: 12px;
+  background: var(--sec-bg); overflow: hidden;
+  border: 1px solid var(--border);
+}
+.section-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px 6px;
+  border-bottom: 1px solid var(--border);
+}
+.section-header h2 {
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .6px; color: var(--hint); margin: 0;
+}
+.badge {
+  font-size: 10px; font-weight: 700; background: rgba(255,255,255,.08);
+  color: var(--hint); padding: 2px 7px; border-radius: 10px;
+}
+
+/* Model section */
+.model-current {
+  padding: 10px 14px 6px;
+}
+.model-name {
+  font-size: 14px; font-weight: 700; color: var(--text);
+}
+.model-sub {
+  font-size: 11px; color: var(--hint); margin-top: 2px;
+}
+.model-loading, .plugin-loading {
+  padding: 14px; font-size: 12px; color: var(--hint); text-align: center;
+}
+.model-presets {
+  display: flex; flex-wrap: wrap; gap: 6px; padding: 6px 14px 12px;
+}
+.model-chip {
+  padding: 5px 11px; border-radius: 20px; font-size: 11px; font-weight: 600;
+  border: 1px solid var(--border); background: transparent;
+  color: var(--hint); cursor: pointer; transition: all .15s;
+}
+.model-chip:active { opacity: .7; }
+.model-chip.active {
+  border-color: var(--accent); color: var(--accent);
+  background: rgba(34,197,94,.1);
+}
+
+/* Plugin list */
+.plugin-list { padding: 4px 0; }
+.plugin-card {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; border-bottom: 1px solid var(--border);
+}
+.plugin-card:last-child { border-bottom: none; }
+.plugin-icon { font-size: 18px; flex-shrink: 0; width: 28px; text-align: center; }
+.plugin-info { flex: 1; min-width: 0; }
+.plugin-name { font-size: 13px; font-weight: 600; color: var(--text); }
+.plugin-desc { font-size: 11px; color: var(--hint); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* iOS-style toggle */
+.toggle-wrap { flex-shrink: 0; }
+.toggle {
+  position: relative; display: inline-block; width: 44px; height: 26px;
+}
+.toggle input { opacity: 0; width: 0; height: 0; position: absolute; }
+.toggle-track {
+  position: absolute; inset: 0; border-radius: 13px;
+  background: rgba(255,255,255,.12); transition: background .2s; cursor: pointer;
+}
+.toggle input:checked + .toggle-track { background: var(--accent); }
+.toggle-thumb {
+  position: absolute; width: 20px; height: 20px; border-radius: 50%;
+  background: #fff; top: 3px; left: 3px; transition: transform .2s;
+  pointer-events: none; box-shadow: 0 1px 3px rgba(0,0,0,.4);
+}
+.toggle input:checked ~ .toggle-thumb { transform: translateX(18px); }
+
+/* Reset button */
+.reset-btn {
+  width: 100%; padding: 12px; border-radius: 10px;
+  background: rgba(239,68,68,.12); border: 1px solid rgba(239,68,68,.25);
+  color: #ef4444; font-size: 14px; font-weight: 700; cursor: pointer;
+  transition: background .15s;
+}
+.reset-btn:active { background: rgba(239,68,68,.22); }
+.reset-hint { font-size: 11px; color: var(--hint); text-align: center; margin-top: 6px; }
+
+/* Toast */
+.toast {
+  position: fixed; top: calc(var(--safe-top) + 54px); left: 50%; transform: translateX(-50%);
+  background: rgba(30,30,30,.95); color: var(--text); padding: 8px 16px;
+  border-radius: 20px; font-size: 12px; font-weight: 600; z-index: 100;
+  opacity: 0; transition: opacity .2s; pointer-events: none; white-space: nowrap;
+  border: 1px solid var(--border);
+}
+.toast.visible { opacity: 1; }
+.toast.success { border-color: rgba(34,197,94,.4); color: var(--accent); }
+
 /* ─── NOT-TELEGRAM GATE ──────────────────────────────────────────────────── */
 #tg-gate {
   display: none;
@@ -506,9 +609,43 @@ body {
 
   <!-- Config Tab ⚙ -->
   <div id="config-panel" class="panel">
-    <div class="panel-placeholder">
-      <div class="p-icon">⚙️</div>
-      <div class="p-label">Config — coming in Phase 3</div>
+    <div class="panel-scroll" id="config-scroll">
+
+      <!-- LLM MODEL SECTION -->
+      <div class="section">
+        <div class="section-header">
+          <h2>LLM Model</h2>
+        </div>
+        <div id="model-current" class="model-current">
+          <div class="model-loading">Loading...</div>
+        </div>
+        <div id="model-presets" class="model-presets">
+          <!-- Preset chips injected by JS -->
+        </div>
+      </div>
+
+      <!-- PLUGINS SECTION -->
+      <div class="section">
+        <div class="section-header">
+          <h2>Plugins</h2>
+          <span class="badge" id="plugins-badge"></span>
+        </div>
+        <div id="plugin-list" class="plugin-list">
+          <div class="plugin-loading">Loading...</div>
+        </div>
+      </div>
+
+      <!-- AGENT SECTION -->
+      <div class="section">
+        <div class="section-header"><h2>Agent</h2></div>
+        <div style="padding: 0 12px 12px;">
+          <button id="reset-btn" class="reset-btn" onclick="resetAgent()">
+            Reset Agent
+          </button>
+          <div class="reset-hint">Interrupts current tasks and resets agent state.</div>
+        </div>
+      </div>
+
     </div>
   </div>
 
@@ -549,6 +686,8 @@ body {
     <span class="tab-label">Shell</span>
   </button>
 </div>
+
+<div id="toast" class="toast"></div>
 
 <script>
 'use strict';
@@ -875,6 +1014,7 @@ function switchTab(name) {
     p.classList.toggle('active', p.id === name + '-panel');
   });
 
+  if (name === 'config') loadConfigTab();
   WebApp?.HapticFeedback?.selectionChanged();
 }
 
@@ -984,6 +1124,188 @@ connectBtn.addEventListener('click', async () => {
   document.getElementById('feed-messages')?.addEventListener('scroll', () => scrollFeed(false));
   WebApp?.HapticFeedback?.notificationOccurred('success');
 });
+
+// ─── TOAST ──────────────────────────────────────────────────────────────────
+function showToast(msg, success = true) {
+  let t = document.getElementById('toast');
+  if (!t) return;
+  t.textContent = msg;
+  t.className = 'toast visible' + (success ? ' success' : '');
+  clearTimeout(t._to);
+  t._to = setTimeout(() => t.classList.remove('visible'), 2500);
+}
+
+// ─── CONFIG TAB ──────────────────────────────────────────────────────────────
+let currentModelConfig = null;
+let pluginList = [];
+let configLoadedAt = 0;
+const CONFIG_CACHE_TTL = 60_000; // 60s
+
+const MODEL_PRESETS = [
+  { label: 'GPT-4o',         provider: 'openai',      name: 'gpt-4o' },
+  { label: 'GPT-4o mini',    provider: 'openai',      name: 'gpt-4o-mini' },
+  { label: 'Claude Sonnet',  provider: 'anthropic',   name: 'claude-sonnet-4-5' },
+  { label: 'Claude Haiku',   provider: 'anthropic',   name: 'claude-haiku-4-5' },
+  { label: 'Gemini Pro',     provider: 'google',      name: 'gemini-2.0-flash' },
+  { label: 'Llama 3',        provider: 'ollama',      name: 'llama3' },
+];
+
+async function loadConfigTab() {
+  if (Date.now() - configLoadedAt < CONFIG_CACHE_TTL) return;
+  await Promise.allSettled([loadModelConfig(), loadPlugins()]);
+  configLoadedAt = Date.now();
+}
+
+// ── Model ─────────────────────────────────────────────────────────────────────
+async function loadModelConfig() {
+  const el = document.getElementById('model-current');
+  if (!el) return;
+  try {
+    const data = await api('/api/plugins/_model_config/model_config_get', { method: 'POST', body: {} });
+    currentModelConfig = data;
+    const cm = data?.config?.chat_model || {};
+    el.innerHTML = `
+      <div class="model-name">${esc(cm.name || 'Unknown')}</div>
+      <div class="model-sub">${esc(cm.provider || '')}${cm.ctx_length ? ' \u00b7 ' + _fmtCtx(cm.ctx_length) : ''}</div>`;
+    renderModelPresets(cm.provider, cm.name);
+  } catch (e) {
+    el.innerHTML = `<div class="model-loading">${e.message?.includes('404') ? 'Model Config plugin not installed' : 'Failed to load model'}</div>`;
+  }
+}
+
+function _fmtCtx(n) {
+  return n >= 1000 ? Math.round(n / 1000) + 'k ctx' : n + ' ctx';
+}
+
+function renderModelPresets(activeProvider, activeName) {
+  const wrap = document.getElementById('model-presets');
+  if (!wrap) return;
+  wrap.innerHTML = MODEL_PRESETS.map(p => {
+    const isActive = p.provider === activeProvider && p.name === activeName;
+    return `<button class="model-chip${isActive ? ' active' : ''}"
+      onclick="setModel('${esc(p.provider)}','${esc(p.name)}','${esc(p.label)}')">${esc(p.label)}</button>`;
+  }).join('');
+}
+
+async function setModel(provider, name, label) {
+  if (!currentModelConfig) return;
+  try {
+    const updated = {
+      ...currentModelConfig.config,
+      chat_model: { ...currentModelConfig.config?.chat_model, provider, name }
+    };
+    await api('/api/plugins/_model_config/model_config_set', { method: 'POST', body: { config: updated } });
+    currentModelConfig = { ...currentModelConfig, config: updated };
+    showToast(`Model \u2192 ${label}`, true);
+    renderModelPresets(provider, name);
+    // Update current display
+    const el = document.getElementById('model-current');
+    if (el) el.innerHTML = `
+      <div class="model-name">${esc(name)}</div>
+      <div class="model-sub">${esc(provider)}</div>`;
+  } catch (e) {
+    showToast('Model update failed', false);
+  }
+}
+
+// ── Plugins ───────────────────────────────────────────────────────────────────
+const PLUGIN_ICONS = {
+  '_telegram_integration': '\ud83d\udcf1',
+  '_model_config': '\ud83e\udde0',
+  '_code_execution': '\ud83d\udcbb',
+  '_memory': '\ud83d\uddc3',
+  '_scheduler': '\u23f0',
+  '_web_search': '\ud83d\udd0d',
+  '_knowledge_tool': '\ud83d\udcda',
+};
+
+async function loadPlugins() {
+  const el = document.getElementById('plugin-list');
+  const badge = document.getElementById('plugins-badge');
+  if (!el) return;
+  try {
+    const data = await api('/api/plugins_list', { method: 'POST', body: {} });
+    // A0 returns array of plugin objects — shape varies; normalise
+    const raw = Array.isArray(data) ? data : (data?.plugins || data?.list || []);
+    // Fetch toggle status for each (parallel)
+    const statuses = await Promise.allSettled(
+      raw.map(p => api('/api/plugins', { method: 'POST', body: { action: 'get_toggle_status', plugin_name: p.name || p } }))
+    );
+    pluginList = raw.map((p, i) => ({
+      name: p.name || p,
+      label: p.label || p.name || p,
+      description: p.description || '',
+      enabled: statuses[i].status === 'fulfilled' ? !!statuses[i].value?.enabled : true,
+    }))
+    // Hide ourselves + _model_config (has dedicated section)
+    .filter(p => p.name !== '_miniapp' && p.name !== '_model_config');
+
+    if (badge) badge.textContent = pluginList.length;
+    renderPluginCards();
+  } catch (e) {
+    el.innerHTML = `<div class="plugin-loading">Failed to load plugins</div>`;
+  }
+}
+
+function renderPluginCards() {
+  const el = document.getElementById('plugin-list');
+  if (!el) return;
+  if (!pluginList.length) {
+    el.innerHTML = '<div class="plugin-loading">No plugins found</div>';
+    return;
+  }
+  el.innerHTML = pluginList.map((p, i) => {
+    const icon = PLUGIN_ICONS[p.name] || '\ud83d\udd0c';
+    const id = `toggle-${i}`;
+    // Prevent disabling telegram integration (breaks auth)
+    const locked = p.name === '_telegram_integration';
+    return `
+      <div class="plugin-card">
+        <div class="plugin-icon">${icon}</div>
+        <div class="plugin-info">
+          <div class="plugin-name">${esc(p.label)}</div>
+          ${p.description ? `<div class="plugin-desc">${esc(p.description)}</div>` : ''}
+        </div>
+        <div class="toggle-wrap">
+          <label class="toggle" title="${locked ? 'Required for auth' : ''}">
+            <input type="checkbox" id="${id}" ${p.enabled ? 'checked' : ''} ${locked ? 'disabled' : ''}
+              onchange="togglePlugin('${esc(p.name)}', ${i}, this.checked)">
+            <div class="toggle-track"></div>
+            <div class="toggle-thumb"></div>
+          </label>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+async function togglePlugin(name, idx, enable) {
+  // Optimistic already applied by checkbox state
+  try {
+    await api('/api/plugins', { method: 'POST', body: { action: 'toggle_plugin', plugin_name: name, enabled: enable } });
+    pluginList[idx].enabled = enable;
+    showToast(`${enable ? 'Enabled' : 'Disabled'} ${pluginList[idx].label}`, true);
+  } catch (e) {
+    // Revert
+    pluginList[idx].enabled = !enable;
+    const cb = document.getElementById(`toggle-${idx}`);
+    if (cb) cb.checked = !enable;
+    showToast(`Failed to toggle ${name}`, false);
+  }
+}
+
+// ── Reset ─────────────────────────────────────────────────────────────────────
+async function resetAgent() {
+  WebApp?.showConfirm('Reset Agent Zero?\n\nCurrent tasks will be interrupted.', async (ok) => {
+    if (!ok) return;
+    try {
+      await api('/api/nudge', { method: 'POST', body: { ctxid: '' } });
+      showToast('Agent reset \u2713', true);
+      WebApp?.HapticFeedback?.notificationOccurred('success');
+    } catch (e) {
+      showToast('Reset failed. Try again.', false);
+    }
+  });
+}
 
 // ─── INIT ────────────────────────────────────────────────────────────────────
 (async function init() {
