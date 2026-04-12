@@ -18,7 +18,7 @@ import urllib.parse
 # Add plugin dir to path so we can import auth.py directly
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'a0-plugin', '_miniapp', 'api'))
 
-from auth import _validate_init_data  # noqa: E402
+from auth import _validate_init_data, _extract_user_id, _get_telegram_config  # noqa: E402
 
 
 # ─── HELPERS ─────────────────────────────────────────────────────────────────
@@ -129,3 +129,54 @@ class TestValidateInitData:
         result = _validate_init_data(init_data, BOT_TOKEN)
         assert result is True
         assert type(result) is bool
+
+
+# ─── P2 FIX: multi-bot token validation ──────────────────────────────────────
+
+class TestMultiBotValidation:
+
+    def test_valid_against_second_token(self):
+        """initData signed with bot2 must validate when bot2 is in the list."""
+        bot2 = "1111111111:BBBsecondBotTokenForTesting456"
+        init_data = build_init_data(bot2, SAMPLE_FIELDS)
+        # Validates against bot2 but not BOT_TOKEN
+        assert _validate_init_data(init_data, BOT_TOKEN) is False
+        assert _validate_init_data(init_data, bot2) is True
+
+    def test_any_match_in_list(self):
+        """any() over multiple tokens: match on second should succeed."""
+        bot2 = "1111111111:BBBsecondBotTokenForTesting456"
+        init_data = build_init_data(bot2, SAMPLE_FIELDS)
+        tokens = [BOT_TOKEN, bot2]
+        assert any(_validate_init_data(init_data, t) for t in tokens) is True
+
+    def test_no_match_in_list_fails(self):
+        """If no token in the list matches, validation must fail."""
+        init_data = build_init_data(BOT_TOKEN, SAMPLE_FIELDS)
+        wrong_tokens = ["9999999999:ZZZ1", "8888888888:ZZZ2"]
+        assert any(_validate_init_data(init_data, t) for t in wrong_tokens) is False
+
+
+# ─── P1 FIX: user authorization ──────────────────────────────────────────────
+
+class TestExtractUserId:
+
+    def test_extracts_id_from_valid_user_field(self):
+        """_extract_user_id must return the integer id from initData user field."""
+        init_data = build_init_data(BOT_TOKEN, SAMPLE_FIELDS)
+        assert _extract_user_id(init_data) == 123456789
+
+    def test_returns_none_on_missing_user_field(self):
+        """initData without a user field must return None."""
+        minimal = build_init_data(BOT_TOKEN, {"auth_date": "1712000000"})
+        assert _extract_user_id(minimal) is None
+
+    def test_returns_none_on_malformed_user_json(self):
+        """Malformed user JSON must return None, not raise."""
+        fields = {**SAMPLE_FIELDS, "user": "not-valid-json"}
+        init_data = build_init_data(BOT_TOKEN, fields)
+        assert _extract_user_id(init_data) is None
+
+    def test_returns_none_on_empty_string(self):
+        """Empty initData must return None."""
+        assert _extract_user_id("") is None

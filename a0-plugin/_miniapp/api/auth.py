@@ -32,21 +32,34 @@ skip_auth = True
 skip_csrf = True
 
 
-def _get_bot_token() -> Optional[str]:
-    """Retrieve the Telegram bot token from the _telegram_integration plugin config."""
+def _get_telegram_config() -> tuple[list[str], list[int]]:
+    """
+    Return (bot_tokens, allowed_user_ids) from _telegram_integration plugin config.
+    bot_tokens: all enabled bot tokens (try each during validation).
+    allowed_user_ids: union of allowed_users across all enabled bots; empty = allow all.
+    """
+    bot_tokens: list[str] = []
+    allowed_ids: set[int] = set()
     try:
-        # A0 plugin config access pattern (matches how webhook.py does it)
         from python.helpers import settings as s
         cfg = s.get_settings()
-        # _telegram_integration stores bots as a list under "bots"
         plugins_cfg = cfg.get("plugins", {})
         tg = plugins_cfg.get("_telegram_integration", {})
         bots = tg.get("bots", [])
-        if bots and bots[0].get("token"):
-            return bots[0]["token"]
+        for bot in bots:
+            if not bot.get("enabled", True):
+                continue
+            token = bot.get("token", "").strip()
+            if token:
+                bot_tokens.append(token)
+            for uid in bot.get("allowed_users", []):
+                try:
+                    allowed_ids.add(int(uid))
+                except (ValueError, TypeError):
+                    pass
     except Exception:
         pass
-    return None
+    return bot_tokens, list(allowed_ids)
 
 
 def _get_mcp_token() -> Optional[str]:
@@ -102,6 +115,19 @@ def _validate_init_data(init_data: str, bot_token: str) -> bool:
         return False
 
 
+def _extract_user_id(init_data: str) -> Optional[int]:
+    """Extract user.id from the 'user' field of initData. Returns None on any failure."""
+    try:
+        parsed = urllib.parse.parse_qs(init_data, keep_blank_values=True)
+        user_json = parsed.get("user", [None])[0]
+        if user_json:
+            user = json.loads(user_json)
+            return int(user["id"])
+    except Exception:
+        pass
+    return None
+
+
 async def execute(request: Any, context: Any = None) -> Any:
     """
     Handle POST /api/plugins/_miniapp/auth.
@@ -126,17 +152,25 @@ async def execute(request: Any, context: Any = None) -> Any:
     if not init_data:
         return _json_response({"error": "init_data is required"}, 400)
 
-    # --- Get bot token ---
-    bot_token = _get_bot_token()
-    if not bot_token:
+    # --- Get all bot tokens + allowed users (P2 + P1 fix) ---
+    bot_tokens, allowed_user_ids = _get_telegram_config()
+    if not bot_tokens:
         return _json_response(
             {"error": "Telegram plugin not found. Enable it in Agent Zero settings."},
             503,
         )
 
-    # --- Validate initData ---
-    if not _validate_init_data(init_data, bot_token):
+    # --- Validate initData against all configured bot tokens (P2) ---
+    valid = any(_validate_init_data(init_data, tok) for tok in bot_tokens)
+    if not valid:
         return _json_response({"error": "invalid signature"}, 401)
+
+    # --- Authorize Telegram user against allowed_users (P1) ---
+    # Extract user.id from the validated init_data
+    if allowed_user_ids:
+        telegram_user_id = _extract_user_id(init_data)
+        if telegram_user_id is None or telegram_user_id not in allowed_user_ids:
+            return _json_response({"error": "user not authorized"}, 403)
 
     # --- Get MCP server token to hand back as api_key ---
     mcp_token = _get_mcp_token()
