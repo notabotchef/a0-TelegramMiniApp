@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="version" content="0.1.0">
 <title>Agent Zero</title>
 <script src="https://telegram.org/js/telegram-web-app.js?62"></script>
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js" defer></script>
@@ -100,6 +101,19 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 .tab-btn.active { color: var(--accent); }
+.tab-btn.active .tab-icon { filter: drop-shadow(0 0 4px rgba(34,197,94,.4)); }
+/* active underline */
+.tab-btn { position: relative; }
+.tab-btn.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 20px; height: 2px;
+  background: var(--accent);
+  border-radius: 1px;
+}
 .tab-icon { font-size: 18px; line-height: 1; }
 .tab-label { font-size: 9px; font-weight: 600; letter-spacing: .3px; text-transform: uppercase; }
 
@@ -566,6 +580,67 @@ body {
 .sheet-btn:active { opacity: .7; }
 .tunnel-hint { font-size: 11px; color: var(--hint); text-align: center; line-height: 1.4; }
 
+/* ─── SHELL TAB ─────────────────────────────────────────────────────────── */
+#shell-panel {
+  display: none; flex-direction: column; padding: 0; overflow: hidden;
+  height: 100%;
+}
+#shell-panel.active { display: flex; }
+
+.shell-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 7px 14px; background: var(--hdr-bg);
+  border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+.shell-cwd { font-size: 11px; color: var(--accent); font-family: inherit; }
+.shell-clear-btn {
+  background: rgba(255,255,255,.06); border: none; color: var(--hint);
+  padding: 4px 10px; border-radius: 7px; font-size: 11px; font-weight: 600;
+  cursor: pointer; font-family: inherit;
+}
+.shell-clear-btn:active { background: rgba(255,255,255,.12); }
+
+#shell-output {
+  flex: 1; overflow-y: auto;
+  background: #050505; color: #d4d4d4;
+  padding: 10px 12px;
+  font-size: 12px; line-height: 1.6;
+  -webkit-overflow-scrolling: touch;
+  word-break: break-word; white-space: pre-wrap;
+}
+#shell-output::-webkit-scrollbar { width: 2px; }
+#shell-output::-webkit-scrollbar-thumb { background: rgba(255,255,255,.08); }
+
+.shell-line { display: block; }
+.shell-line.cmd    { color: var(--accent); }
+.shell-line.stderr { color: #fbbf24; }
+.shell-line.exit-err { color: #ef4444; }
+.shell-line.meta   { color: var(--hint); font-style: italic; }
+
+.shell-welcome { color: var(--hint); font-style: italic; margin-bottom: 4px; display: block; }
+
+.shell-input-bar {
+  display: flex; align-items: center;
+  background: #050505; border-top: 1px solid var(--border);
+  padding: 8px 12px calc(var(--safe-bottom) + 8px);
+  flex-shrink: 0;
+}
+.shell-prompt { color: var(--accent); font-size: 13px; margin-right: 6px; flex-shrink: 0; }
+#shell-input {
+  flex: 1; background: transparent; border: none; outline: none;
+  color: #d4d4d4; font-family: inherit; font-size: 13px;
+  caret-color: var(--accent);
+  -webkit-appearance: none; appearance: none;
+}
+#shell-run {
+  background: rgba(34,197,94,.12); border: 1px solid rgba(34,197,94,.25);
+  color: var(--accent); font-size: 14px; font-weight: 700;
+  width: 32px; height: 32px; border-radius: 8px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; margin-left: 6px;
+}
+#shell-run:active { background: rgba(34,197,94,.25); }
+
 /* ─── NOT-TELEGRAM GATE ──────────────────────────────────────────────────── */
 #tg-gate {
   display: none;
@@ -661,7 +736,8 @@ body {
   <button id="connect-btn" disabled>Connect</button>
 
   <div class="setup-footer">
-    Need help? See the <a href="https://github.com/yourusername/agent0-telegram-miniapp#readme" target="_blank" rel="noopener">setup guide</a>.
+    Need help? See the <a href="https://github.com/notabotchef/agent-zero-telegram-miniapp#readme" target="_blank" rel="noopener">setup guide</a>.
+    <br>v0.1.0 &middot; notabotchef/agent-zero-telegram-miniapp
   </div>
 </div>
 
@@ -770,9 +846,24 @@ body {
 
   <!-- Shell Tab >_ -->
   <div id="shell-panel" class="panel">
-    <div class="panel-placeholder">
-      <div class="p-icon">&gt;_</div>
-      <div class="p-label">Shell — coming in Phase 5</div>
+    <div class="shell-header">
+      <span class="shell-cwd">/a0</span>
+      <button class="shell-clear-btn" onclick="clearShell()">Clear</button>
+    </div>
+    <div id="shell-output">
+      <span class="shell-welcome">Agent Zero Shell v0.1 — direct access to the Docker container</span>
+    </div>
+    <div class="shell-input-bar">
+      <span class="shell-prompt">$</span>
+      <input id="shell-input"
+             type="text"
+             placeholder="type a command..."
+             autocomplete="off"
+             autocorrect="off"
+             autocapitalize="none"
+             spellcheck="false"
+             onkeydown="shellKeydown(event)">
+      <button id="shell-run" onclick="runShell()" title="Run">↵</button>
     </div>
   </div>
 
@@ -1143,6 +1234,7 @@ function switchTab(name) {
 
   if (name === 'config') loadConfigTab();
   if (name === 'manage') loadManageTab();
+  if (name === 'shell')  setTimeout(() => document.getElementById('shell-input')?.focus(), 80);
   WebApp?.HapticFeedback?.selectionChanged();
 }
 
@@ -1697,11 +1789,139 @@ async function copyTunnelUrl() {
   WebApp?.HapticFeedback?.impactOccurred('light');
 }
 
+// ─── SHELL TAB ───────────────────────────────────────────────────────────────
+let shellHistory    = [];   // command history, max 50
+let shellHistoryIdx = -1;   // current position (-1 = not navigating)
+const SHELL_MAX_LINES = 500;
+let shellLineCount = 0;
+
+function _appendShellLine(text, cls = '') {
+  const out = document.getElementById('shell-output');
+  if (!out) return;
+  // Trim oldest lines over limit
+  if (shellLineCount >= SHELL_MAX_LINES) {
+    const first = out.querySelector('.shell-line');
+    if (first) first.remove();
+  } else {
+    shellLineCount++;
+  }
+  const span = document.createElement('span');
+  span.className = 'shell-line' + (cls ? ' ' + cls : '');
+  span.textContent = text;
+  out.appendChild(span);
+  out.appendChild(document.createTextNode('\n'));
+  out.scrollTop = out.scrollHeight;
+}
+
+function appendShellOutput(stdout, stderr, exitCode) {
+  if (stdout) stdout.split('\n').forEach(l => { if (l !== '') _appendShellLine(l); });
+  if (stderr) stderr.split('\n').forEach(l => { if (l !== '') _appendShellLine(l, 'stderr'); });
+  if (exitCode !== 0) _appendShellLine(`exit ${exitCode}`, 'exit-err');
+}
+
+function clearShell() {
+  const out = document.getElementById('shell-output');
+  if (!out) return;
+  out.innerHTML = '<span class="shell-welcome">Agent Zero Shell v0.1 — direct access to the Docker container</span>\n';
+  shellLineCount = 0;
+}
+
+function scrollShellToBottom() {
+  const out = document.getElementById('shell-output');
+  if (out) out.scrollTop = out.scrollHeight;
+}
+
+async function runShell(cmdArg) {
+  const input = document.getElementById('shell-input');
+  const cmd = (cmdArg !== undefined ? cmdArg : input?.value || '').trim();
+  if (!cmd) return;
+  if (input) input.value = '';
+
+  // Echo the command
+  _appendShellLine('$ ' + cmd, 'cmd');
+
+  // Save to history (skip duplicates at top)
+  if (!shellHistory.length || shellHistory[0] !== cmd) {
+    shellHistory.unshift(cmd);
+    if (shellHistory.length > 50) shellHistory.pop();
+  }
+  shellHistoryIdx = -1;
+
+  // Loading indicator
+  _appendShellLine('...', 'meta');
+  const loadingLine = document.getElementById('shell-output')?.lastElementChild?.previousElementSibling;
+
+  try {
+    const data = await api('/api/plugins/_miniapp/shell', { method: 'POST', body: { cmd } });
+    // Remove loading line
+    if (loadingLine && loadingLine.textContent === '...') {
+      loadingLine.nextSibling?.remove(); // newline
+      loadingLine.remove();
+    }
+    if (data?.error) {
+      _appendShellLine(data.error, data.exit_code === -1 ? 'exit-err' : 'stderr');
+    } else {
+      appendShellOutput(data?.stdout || '', data?.stderr || '', data?.exit_code ?? 0);
+      if (data?.duration_ms !== undefined) {
+        _appendShellLine(`[${data.duration_ms}ms]`, 'meta');
+      }
+    }
+  } catch (e) {
+    if (loadingLine && loadingLine.textContent === '...') {
+      loadingLine.nextSibling?.remove();
+      loadingLine.remove();
+    }
+    _appendShellLine(e.message || 'Request failed', 'exit-err');
+  }
+
+  scrollShellToBottom();
+  input?.focus();
+}
+
+function shellKeydown(e) {
+  const input = document.getElementById('shell-input');
+  if (!input) return;
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    runShell();
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    if (shellHistory.length) {
+      shellHistoryIdx = Math.min(shellHistoryIdx + 1, shellHistory.length - 1);
+      input.value = shellHistory[shellHistoryIdx] || '';
+      // Move cursor to end
+      setTimeout(() => input.setSelectionRange(input.value.length, input.value.length), 0);
+    }
+  } else if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    if (shellHistoryIdx > 0) {
+      shellHistoryIdx--;
+      input.value = shellHistory[shellHistoryIdx] || '';
+    } else {
+      shellHistoryIdx = -1;
+      input.value = '';
+    }
+  }
+}
+
 // ─── INIT ────────────────────────────────────────────────────────────────────
 (async function init() {
   if (WebApp) {
     WebApp.ready();
     WebApp.expand();
+  }
+
+  // ── Keyboard: push shell input above keyboard on mobile ──────────────────
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', () => {
+      const offset = window.innerHeight - window.visualViewport.height;
+      const bar = document.querySelector('.shell-input-bar');
+      if (bar) {
+        bar.style.paddingBottom = offset > 60
+          ? (offset + 8) + 'px'
+          : '';
+      }
+    });
   }
 
   // Must be inside Telegram to use initData auth
