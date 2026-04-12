@@ -628,9 +628,12 @@ function connectSocket() {
 }
 
 // ─── FEED RENDERING ──────────────────────────────────────────────────────────
+const FEED_MAX = 200;
+
 function addFeedItem(type, data) {
   if (feedPaused) {
     feedBuffer.push({ type, data });
+    if (feedBuffer.length > FEED_MAX) feedBuffer.shift(); // cap buffer, drop oldest
     _updatePausedBanner();
     return;
   }
