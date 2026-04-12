@@ -1,0 +1,5 @@
+name: "miniapp"
+label: "Telegram Mini App"
+description: "Auth + shell bridge for the Agent Zero Telegram Mini App"
+version: "0.1.0"
+enabled: true

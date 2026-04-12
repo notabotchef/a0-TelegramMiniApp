@@ -1,0 +1,4 @@
+# List of Telegram bot names whose initData this plugin will accept.
+# Matches against bot names configured in the _telegram_integration plugin.
+# Leave empty to accept any bot configured in _telegram_integration.
+allowed_telegram_bots: []
