@@ -114,7 +114,8 @@ body {
   background: var(--accent);
   border-radius: 1px;
 }
-.tab-icon { font-size: 18px; line-height: 1; }
+.tab-icon { display: block; width: 22px; height: 22px; line-height: 1; }
+.tab-icon svg { display: block; width: 100%; height: 100%; }
 .tab-label { font-size: 9px; font-weight: 600; letter-spacing: .3px; text-transform: uppercase; }
 
 /* ─── PANELS ─────────────────────────────────────────────────────────────── */
@@ -873,19 +874,19 @@ body {
 <!-- ─── TAB BAR ───────────────────────────────────────────────────────────── -->
 <div id="tab-bar">
   <button class="tab-btn active" data-tab="feed"   onclick="switchTab('feed')">
-    <span class="tab-icon">⚡</span>
+    <span class="tab-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></span>
     <span class="tab-label">Feed</span>
   </button>
   <button class="tab-btn"        data-tab="config" onclick="switchTab('config')">
-    <span class="tab-icon">⚙️</span>
+    <span class="tab-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="8" x2="20" y2="8"/><line x1="4" y1="16" x2="20" y2="16"/><circle cx="9" cy="8" r="2.5"/><circle cx="15" cy="16" r="2.5"/></svg></span>
     <span class="tab-label">Config</span>
   </button>
   <button class="tab-btn"        data-tab="manage" onclick="switchTab('manage')">
-    <span class="tab-icon">💬</span>
+    <span class="tab-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
     <span class="tab-label">Manage</span>
   </button>
   <button class="tab-btn"        data-tab="shell"  onclick="switchTab('shell')">
-    <span class="tab-icon">&gt;_</span>
+    <span class="tab-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><polyline points="7 15 10 12 7 9"/><line x1="13" y1="15" x2="17" y2="15"/></svg></span>
     <span class="tab-label">Shell</span>
   </button>
 </div>
