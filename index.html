@@ -423,15 +423,18 @@ body {
   display: flex; flex-wrap: wrap; gap: 6px; padding: 6px 14px 12px;
 }
 .model-chip {
-  padding: 5px 11px; border-radius: 20px; font-size: 11px; font-weight: 600;
+  padding: 8px 12px; border-radius: 12px; font-size: 11px;
   border: 1px solid var(--border); background: transparent;
   color: var(--hint); cursor: pointer; transition: all .15s;
+  text-align: left; min-width: 0; flex: 1 1 calc(50% - 4px);
 }
 .model-chip:active { opacity: .7; }
 .model-chip.active {
   border-color: var(--accent); color: var(--accent);
   background: rgba(34,197,94,.1);
 }
+.model-chip .chip-label { font-weight: 600; display: block; }
+.model-chip .chip-sub { font-size: 10px; opacity: .6; display: block; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* Plugin list */
 .plugin-list { padding: 4px 0; }
@@ -1378,19 +1381,31 @@ let pluginList = [];
 let configLoadedAt = 0;
 const CONFIG_CACHE_TTL = 60_000; // 60s
 
-const MODEL_PRESETS = [
-  { label: 'GPT-4o',         provider: 'openai',      name: 'gpt-4o' },
-  { label: 'GPT-4o mini',    provider: 'openai',      name: 'gpt-4o-mini' },
-  { label: 'Claude Sonnet',  provider: 'anthropic',   name: 'claude-sonnet-4-5' },
-  { label: 'Claude Haiku',   provider: 'anthropic',   name: 'claude-haiku-4-5' },
-  { label: 'Gemini Pro',     provider: 'google',      name: 'gemini-2.0-flash' },
-  { label: 'Llama 3',        provider: 'ollama',      name: 'llama3' },
-];
+let MODEL_PRESETS = []; // loaded dynamically from A0 presets.yaml
 
 async function loadConfigTab() {
   if (Date.now() - configLoadedAt < CONFIG_CACHE_TTL) return;
+  await loadModelPresets(); // fetch presets before rendering model config
   await Promise.allSettled([loadModelConfig(), loadPlugins()]);
   configLoadedAt = Date.now();
+}
+
+async function loadModelPresets() {
+  try {
+    const data = await api('/api/plugins/_miniapp/presets', { method: 'POST', body: {} });
+    const raw = data?.presets || [];
+    MODEL_PRESETS = raw.map(p => ({
+      label: p.name || 'Unnamed',
+      chatProvider: p.chat?.provider || '',
+      chatName: p.chat?.name || '',
+      utilityProvider: p.utility?.provider || '',
+      utilityName: p.utility?.name || '',
+      chat: p.chat || {},
+      utility: p.utility || {},
+    }));
+  } catch (_) {
+    MODEL_PRESETS = [];
+  }
 }
 
 // ── Model ─────────────────────────────────────────────────────────────────────
@@ -1417,31 +1432,40 @@ function _fmtCtx(n) {
 function renderModelPresets(activeProvider, activeName) {
   const wrap = document.getElementById('model-presets');
   if (!wrap) return;
-  wrap.innerHTML = MODEL_PRESETS.map(p => {
-    const isActive = p.provider === activeProvider && p.name === activeName;
+  if (!MODEL_PRESETS.length) {
+    wrap.innerHTML = '<div class="model-loading">No presets found</div>';
+    return;
+  }
+  wrap.innerHTML = MODEL_PRESETS.map((p, i) => {
+    const isActive = p.chatProvider === activeProvider && p.chatName === activeName;
     return `<button class="model-chip${isActive ? ' active' : ''}"
-      onclick="setModel('${esc(p.provider)}','${esc(p.name)}','${esc(p.label)}')">${esc(p.label)}</button>`;
+      onclick="applyPreset(${i})">
+      <span class="chip-label">${esc(p.label)}</span>
+      <span class="chip-sub">${esc(p.chatProvider)} / ${esc(p.chatName)}</span>
+    </button>`;
   }).join('');
 }
 
-async function setModel(provider, name, label) {
-  if (!currentModelConfig) return;
+async function applyPreset(idx) {
+  const p = MODEL_PRESETS[idx];
+  if (!p || !currentModelConfig) return;
   try {
     const updated = {
       ...currentModelConfig.config,
-      chat_model: { ...currentModelConfig.config?.chat_model, provider, name }
+      chat_model: { ...currentModelConfig.config?.chat_model, ...p.chat },
+      utility_model: { ...currentModelConfig.config?.utility_model, ...p.utility },
     };
     await api('/api/plugins/_model_config/model_config_set', { method: 'POST', body: { config: updated } });
     currentModelConfig = { ...currentModelConfig, config: updated };
-    showToast(`Model \u2192 ${label}`, true);
-    renderModelPresets(provider, name);
+    showToast(`Preset \u2192 ${p.label}`, true);
+    renderModelPresets(p.chatProvider, p.chatName);
     // Update current display
     const el = document.getElementById('model-current');
     if (el) el.innerHTML = `
-      <div class="model-name">${esc(name)}</div>
-      <div class="model-sub">${esc(provider)}</div>`;
+      <div class="model-name">${esc(p.chatName)}</div>
+      <div class="model-sub">${esc(p.chatProvider)}${p.chat.ctx_length ? ' \u00b7 ' + _fmtCtx(p.chat.ctx_length) : ''}</div>`;
   } catch (e) {
-    showToast('Model update failed', false);
+    showToast('Preset update failed', false);
   }
 }
 
@@ -1461,18 +1485,16 @@ async function loadPlugins() {
   const badge = document.getElementById('plugins-badge');
   if (!el) return;
   try {
-    const data = await api('/api/plugins_list', { method: 'POST', body: {} });
-    // A0 returns array of plugin objects — shape varies; normalise
+    const data = await api('/api/plugins_list', { method: 'POST', body: { filter: { custom: true } } });
+    // A0 returns { ok, plugins: [{ name, display_name, description, toggle_state, ... }] }
     const raw = Array.isArray(data) ? data : (data?.plugins || data?.list || []);
-    // Fetch toggle status for each (parallel)
-    const statuses = await Promise.allSettled(
-      raw.map(p => api('/api/plugins', { method: 'POST', body: { action: 'get_toggle_status', plugin_name: p.name || p } }))
-    );
-    pluginList = raw.map((p, i) => ({
+    pluginList = raw.map(p => ({
       name: p.name || p,
-      label: p.label || p.name || p,
+      label: p.display_name || p.label || p.name || p,
       description: p.description || '',
-      enabled: statuses[i].status === 'fulfilled' ? !!statuses[i].value?.enabled : true,
+      // toggle_state: "enabled" | "disabled" | "advanced"; treat anything not "disabled" as enabled
+      enabled: (p.toggle_state || 'enabled') !== 'disabled',
+      alwaysEnabled: !!p.always_enabled,
     }))
     // Hide ourselves + _model_config (has dedicated section)
     .filter(p => p.name !== '_miniapp' && p.name !== '_model_config');
@@ -1494,8 +1516,8 @@ function renderPluginCards() {
   el.innerHTML = pluginList.map((p, i) => {
     const icon = PLUGIN_ICONS[p.name] || '\ud83d\udd0c';
     const id = `toggle-${i}`;
-    // Prevent disabling telegram integration (breaks auth)
-    const locked = p.name === '_telegram_integration';
+    // Prevent disabling always-enabled or critical plugins
+    const locked = p.alwaysEnabled || p.name === '_telegram_integration';
     return `
       <div class="plugin-card">
         <div class="plugin-icon">${icon}</div>
@@ -1532,10 +1554,10 @@ async function togglePlugin(name, idx, enable) {
 
 // ── Reset ─────────────────────────────────────────────────────────────────────
 async function resetAgent() {
-  WebApp?.showConfirm('Reset Agent Zero?\n\nCurrent tasks will be interrupted.', async (ok) => {
+  WebApp?.showConfirm('Reset Agent Zero?\n\nThis clears the agent cache.', async (ok) => {
     if (!ok) return;
     try {
-      await api('/api/nudge', { method: 'POST', body: { ctxid: '' } });
+      await api('/api/plugins/_miniapp/reset', { method: 'POST', body: {} });
       showToast('Agent reset \u2713', true);
       WebApp?.HapticFeedback?.notificationOccurred('success');
     } catch (e) {
