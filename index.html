@@ -71,18 +71,7 @@ body {
 }
 #conn-dot.online  { background: var(--accent); }
 #conn-dot.offline { background: var(--destructive); }
-#tunnel-badge {
-  display: none;
-  font-size: 9px;
-  font-weight: 700;
-  padding: 2px 7px;
-  border-radius: 12px;
-  background: rgba(34,197,94,.15);
-  color: var(--accent);
-  border: 1px solid rgba(34,197,94,.3);
-  letter-spacing: .3px;
-  text-transform: uppercase;
-}
+/* tunnel badge — replaced in Phase 4 */
 
 /* ─── TAB BAR ────────────────────────────────────────────────────────────── */
 #tab-bar {
@@ -476,6 +465,107 @@ body {
 .toast.visible { opacity: 1; }
 .toast.success { border-color: rgba(34,197,94,.4); color: var(--accent); }
 
+/* ─── MANAGE TAB ────────────────────────────────────────────────────────────── */
+#manage-panel { padding: 0; }
+
+.section-action-btn {
+  font-size: 11px; font-weight: 700; color: var(--accent);
+  background: rgba(34,197,94,.1); border: 1px solid rgba(34,197,94,.25);
+  padding: 4px 10px; border-radius: 8px; cursor: pointer;
+}
+.section-action-btn:active { opacity: .7; }
+
+.item-list { padding: 4px 0; }
+.list-loading { padding: 14px; font-size: 12px; color: var(--hint); text-align: center; }
+.list-empty { padding: 20px 14px; font-size: 12px; color: var(--hint); text-align: center; }
+
+/* Chat rows */
+.chat-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; border-bottom: 1px solid var(--border); cursor: pointer;
+}
+.chat-row:last-child { border-bottom: none; }
+.chat-row:active { background: rgba(255,255,255,.03); }
+.chat-icon { font-size: 16px; flex-shrink: 0; }
+.chat-info { flex: 1; min-width: 0; }
+.chat-title { font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chat-meta { font-size: 11px; color: var(--hint); margin-top: 1px; }
+.row-del-btn {
+  background: none; border: none; color: var(--hint); font-size: 16px; cursor: pointer;
+  padding: 4px 6px; border-radius: 6px; flex-shrink: 0;
+}
+.row-del-btn:active { color: var(--destructive); background: rgba(239,68,68,.1); }
+
+/* Task rows */
+.task-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; border-bottom: 1px solid var(--border);
+}
+.task-row:last-child { border-bottom: none; }
+.task-status-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+}
+.task-status-dot.running { background: var(--accent); animation: pulse 2s infinite; }
+.task-status-dot.idle    { background: #60a5fa; }
+.task-status-dot.disabled{ background: var(--hint); }
+.task-status-dot.failed  { background: var(--destructive); }
+.task-info { flex: 1; min-width: 0; }
+.task-name { font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.task-schedule { font-size: 11px; color: var(--hint); margin-top: 1px; }
+.task-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.task-btn {
+  font-size: 11px; font-weight: 700; padding: 4px 9px; border-radius: 7px;
+  border: 1px solid var(--border); background: rgba(255,255,255,.06); color: var(--hint); cursor: pointer;
+}
+.task-btn.run:active { background: rgba(34,197,94,.15); border-color: var(--accent); color: var(--accent); }
+.task-btn.del:active { background: rgba(239,68,68,.15); border-color: var(--destructive); color: var(--destructive); }
+
+/* Tunnel badge in header */
+.tunnel-badge {
+  display: flex; align-items: center; gap: 4px;
+  background: rgba(255,255,255,.06); border: 1px solid var(--border);
+  border-radius: 10px; padding: 3px 8px; font-size: 11px; color: var(--hint);
+  cursor: pointer; margin-left: 6px;
+}
+.tunnel-badge.active { border-color: rgba(34,197,94,.4); color: var(--accent); }
+.tunnel-badge:active { opacity: .7; }
+
+/* Bottom sheet */
+.sheet-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 60;
+  opacity: 0; pointer-events: none; transition: opacity .25s;
+}
+.sheet-overlay.open { opacity: 1; pointer-events: all; }
+.bottom-sheet {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 61;
+  background: var(--sec-bg); border-radius: 16px 16px 0 0;
+  padding: 0 16px calc(var(--safe-bottom) + 16px);
+  transform: translateY(100%); transition: transform .3s cubic-bezier(.4,0,.2,1);
+  border-top: 1px solid var(--border);
+}
+.bottom-sheet.open { transform: translateY(0); }
+.sheet-handle {
+  width: 36px; height: 4px; border-radius: 2px;
+  background: rgba(255,255,255,.15); margin: 10px auto 14px;
+}
+.sheet-title { font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 14px; }
+.tunnel-status-row { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+.tunnel-dot {
+  width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+  background: var(--hint);
+}
+.tunnel-dot.active { background: var(--accent); animation: pulse 2s infinite; }
+.tunnel-url-text { font-size: 12px; color: var(--text); font-family: monospace; word-break: break-all; }
+.sheet-actions { display: flex; gap: 8px; margin-bottom: 12px; }
+.sheet-btn {
+  flex: 1; padding: 11px; border-radius: 10px; font-size: 13px; font-weight: 700;
+  border: 1px solid var(--border); background: rgba(255,255,255,.06); color: var(--text); cursor: pointer;
+}
+.sheet-btn.accent { background: rgba(34,197,94,.12); border-color: rgba(34,197,94,.35); color: var(--accent); }
+.sheet-btn.danger { background: rgba(239,68,68,.1); border-color: rgba(239,68,68,.25); color: #ef4444; }
+.sheet-btn:active { opacity: .7; }
+.tunnel-hint { font-size: 11px; color: var(--hint); text-align: center; line-height: 1.4; }
+
 /* ─── NOT-TELEGRAM GATE ──────────────────────────────────────────────────── */
 #tg-gate {
   display: none;
@@ -579,7 +669,9 @@ body {
 <div id="app-header">
   <div class="header-title">Agent Zero</div>
   <div class="header-right">
-    <span id="tunnel-badge">TUNNEL</span>
+    <button class="tunnel-badge" id="tunnel-badge" onclick="openTunnelSheet()" title="Tunnel status">
+      🌐 <span id="tunnel-badge-label">—</span>
+    </button>
     <span id="conn-dot"></span>
   </div>
 </div>
@@ -651,9 +743,28 @@ body {
 
   <!-- Manage Tab 💬 -->
   <div id="manage-panel" class="panel">
-    <div class="panel-placeholder">
-      <div class="p-icon">💬</div>
-      <div class="p-label">Manage — coming in Phase 4</div>
+    <div class="panel-scroll">
+
+      <div class="section">
+        <div class="section-header">
+          <h2>Conversations</h2>
+          <button class="section-action-btn" onclick="newChat()">+ New</button>
+        </div>
+        <div id="chat-list" class="item-list">
+          <div class="list-loading">Loading...</div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-header">
+          <h2>Scheduled Tasks</h2>
+          <span class="badge" id="tasks-badge"></span>
+        </div>
+        <div id="task-list" class="item-list">
+          <div class="list-loading">Loading...</div>
+        </div>
+      </div>
+
     </div>
   </div>
 
@@ -688,6 +799,22 @@ body {
 </div>
 
 <div id="toast" class="toast"></div>
+
+<div class="sheet-overlay" id="tunnel-overlay" onclick="closeTunnelSheet()"></div>
+<div class="bottom-sheet" id="tunnel-sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title">Cloudflare Tunnel</div>
+  <div id="tunnel-status-row" class="tunnel-status-row">
+    <span id="tunnel-dot" class="tunnel-dot"></span>
+    <span id="tunnel-url-text" class="tunnel-url-text">Checking...</span>
+  </div>
+  <div class="sheet-actions">
+    <button id="tunnel-copy-btn" class="sheet-btn" onclick="copyTunnelUrl()" style="display:none">📋 Copy URL</button>
+    <button id="tunnel-start-btn" class="sheet-btn accent" onclick="startTunnel()" style="display:none">Start Tunnel</button>
+    <button id="tunnel-stop-btn" class="sheet-btn danger" onclick="stopTunnel()" style="display:none">Stop Tunnel</button>
+  </div>
+  <div id="tunnel-hint" class="tunnel-hint">Set this URL as your Mini App URL in @BotFather → /setmenubutton</div>
+</div>
 
 <script>
 'use strict';
@@ -1015,6 +1142,7 @@ function switchTab(name) {
   });
 
   if (name === 'config') loadConfigTab();
+  if (name === 'manage') loadManageTab();
   WebApp?.HapticFeedback?.selectionChanged();
 }
 
@@ -1121,6 +1249,7 @@ connectBtn.addEventListener('click', async () => {
   setConnDot('online');
   showApp();
   connectSocket();
+  loadTunnel();
   document.getElementById('feed-messages')?.addEventListener('scroll', () => scrollFeed(false));
   WebApp?.HapticFeedback?.notificationOccurred('success');
 });
@@ -1307,6 +1436,267 @@ async function resetAgent() {
   });
 }
 
+// ─── MANAGE TAB ──────────────────────────────────────────────────────────────
+let chatList = [];
+let taskList = [];
+let manageLoadedAt = 0;
+let tunnelUrl = null;
+let tunnelRunning = false;
+let tunnelStartPolling = null;
+const MANAGE_CACHE_TTL = 30_000;
+
+async function loadManageTab() {
+  if (Date.now() - manageLoadedAt < MANAGE_CACHE_TTL) return;
+  await Promise.allSettled([loadChats(), loadTasks()]);
+  manageLoadedAt = Date.now();
+}
+
+// ── Chats ─────────────────────────────────────────────────────────────────────
+function _relativeDate(ts) {
+  if (!ts) return '';
+  const d = new Date(typeof ts === 'number' ? ts * 1000 : ts);
+  const diff = (Date.now() - d) / 1000;
+  if (diff < 3600)   return Math.round(diff/60) + 'm ago';
+  if (diff < 86400)  return Math.round(diff/3600) + 'h ago';
+  if (diff < 172800) return 'Yesterday';
+  return d.toLocaleDateString([], {month:'short', day:'numeric'});
+}
+
+async function loadChats() {
+  const el = document.getElementById('chat-list');
+  if (!el) return;
+  try {
+    const data = await api('/api/history_get', { method: 'POST', body: { context: '' } });
+    let contexts = [];
+    if (Array.isArray(data)) contexts = data;
+    else if (Array.isArray(data?.contexts)) contexts = data.contexts;
+    else if (Array.isArray(data?.history)) contexts = data.history;
+    else {
+      el.innerHTML = '<div class="list-empty">Chat list not available in this A0 version.</div>';
+      return;
+    }
+    chatList = contexts.map(c => ({
+      id: c.id || c.ctxid || c.context_id || c,
+      title: c.title || c.name || ('Conversation ' + (c.id || '').slice(0,6)),
+      created: c.created_at || c.created || c.timestamp || null,
+      messages: c.message_count || c.messages || null,
+    }));
+    renderChatList();
+  } catch (e) {
+    el.innerHTML = '<div class="list-empty">Could not load conversations.</div>';
+  }
+}
+
+function renderChatList() {
+  const el = document.getElementById('chat-list');
+  if (!el) return;
+  if (!chatList.length) {
+    el.innerHTML = '<div class="list-empty">No conversations yet.</div>';
+    return;
+  }
+  el.innerHTML = chatList.map((c, i) => `
+    <div class="chat-row">
+      <div class="chat-icon">💬</div>
+      <div class="chat-info">
+        <div class="chat-title">${esc(c.title)}</div>
+        <div class="chat-meta">${c.created ? _relativeDate(c.created) : ''}${c.messages ? ' \u00b7 ' + c.messages + ' msgs' : ''}</div>
+      </div>
+      <button class="row-del-btn" onclick="deleteChat('${esc(c.id)}',${i})" title="Delete">🗑</button>
+    </div>`).join('');
+}
+
+async function newChat() {
+  try {
+    const data = await api('/api/chat_create', { method: 'POST', body: {} });
+    const id = data?.ctxid || data?.id || '';
+    chatList.unshift({ id, title: 'New Conversation', created: Date.now()/1000, messages: 0 });
+    renderChatList();
+    showToast('New conversation created', true);
+    WebApp?.HapticFeedback?.impactOccurred('light');
+  } catch (e) { showToast('Failed to create chat', false); }
+}
+
+async function deleteChat(id, idx) {
+  WebApp?.showConfirm('Delete this conversation?', async (ok) => {
+    if (!ok) return;
+    try {
+      await api('/api/chat_remove', { method: 'POST', body: { context: id } });
+      chatList.splice(idx, 1);
+      renderChatList();
+      showToast('Conversation deleted', true);
+    } catch (e) { showToast('Failed to delete', false); }
+  });
+}
+
+// ── Scheduler ─────────────────────────────────────────────────────────────────
+function _taskDotClass(t) {
+  if (!t.enabled) return 'disabled';
+  if (t.status === 'running') return 'running';
+  if (t.status === 'failed' || t.status === 'error') return 'failed';
+  return 'idle';
+}
+
+async function loadTasks() {
+  const el = document.getElementById('task-list');
+  const badge = document.getElementById('tasks-badge');
+  if (!el) return;
+  try {
+    const data = await api('/api/scheduler_tasks_list', { method: 'POST', body: {} });
+    taskList = Array.isArray(data) ? data : (data?.tasks || data?.list || []);
+    if (badge) badge.textContent = taskList.length;
+    renderTaskList();
+  } catch (e) {
+    el.innerHTML = '<div class="list-empty">Could not load tasks.</div>';
+  }
+}
+
+function renderTaskList() {
+  const el = document.getElementById('task-list');
+  if (!el) return;
+  if (!taskList.length) {
+    el.innerHTML = '<div class="list-empty">No scheduled tasks.</div>';
+    return;
+  }
+  el.innerHTML = taskList.map((t, i) => `
+    <div class="task-row">
+      <div class="task-status-dot ${_taskDotClass(t)}"></div>
+      <div class="task-info">
+        <div class="task-name">${esc(t.name || t.id || 'Task')}</div>
+        <div class="task-schedule">${esc(t.schedule || t.schedule_display || '')}</div>
+      </div>
+      <div class="task-actions">
+        <button class="task-btn run" onclick="runTask('${esc(t.id)}',${i})">▶ Run</button>
+        <button class="task-btn del" onclick="deleteTask('${esc(t.id)}',${i})">🗑</button>
+      </div>
+    </div>`).join('');
+}
+
+async function runTask(id, idx) {
+  try {
+    await api('/api/scheduler_task_run', { method: 'POST', body: { id } });
+    showToast('Task triggered \u2713', true);
+    WebApp?.HapticFeedback?.impactOccurred('medium');
+  } catch (e) { showToast('Task trigger failed', false); }
+}
+
+async function deleteTask(id, idx) {
+  WebApp?.showConfirm('Delete this scheduled task?', async (ok) => {
+    if (!ok) return;
+    try {
+      await api('/api/scheduler_task_delete', { method: 'POST', body: { id } });
+      taskList.splice(idx, 1);
+      const badge = document.getElementById('tasks-badge');
+      if (badge) badge.textContent = taskList.length;
+      renderTaskList();
+      showToast('Task deleted', true);
+    } catch (e) { showToast('Failed to delete task', false); }
+  });
+}
+
+// ── Tunnel ────────────────────────────────────────────────────────────────────
+async function loadTunnel() {
+  try {
+    const data = await api('/api/tunnel', { method: 'POST', body: { action: 'get' } });
+    tunnelUrl = data?.tunnel_url || null;
+    tunnelRunning = !!data?.is_running;
+    _updateTunnelBadge();
+  } catch (_) { /* tunnel endpoint may not be reachable — silent */ }
+}
+
+function _updateTunnelBadge() {
+  const badge = document.getElementById('tunnel-badge');
+  const label = document.getElementById('tunnel-badge-label');
+  if (!badge || !label) return;
+  if (tunnelRunning && tunnelUrl) {
+    label.textContent = 'ON';
+    badge.classList.add('active');
+  } else {
+    label.textContent = 'OFF';
+    badge.classList.remove('active');
+  }
+}
+
+function openTunnelSheet() {
+  loadTunnel().then(_refreshTunnelSheet);
+  document.getElementById('tunnel-overlay')?.classList.add('open');
+  document.getElementById('tunnel-sheet')?.classList.add('open');
+}
+
+function closeTunnelSheet() {
+  document.getElementById('tunnel-overlay')?.classList.remove('open');
+  document.getElementById('tunnel-sheet')?.classList.remove('open');
+  if (tunnelStartPolling) { clearInterval(tunnelStartPolling); tunnelStartPolling = null; }
+}
+
+function _refreshTunnelSheet() {
+  const dot  = document.getElementById('tunnel-dot');
+  const txt  = document.getElementById('tunnel-url-text');
+  const copy = document.getElementById('tunnel-copy-btn');
+  const start= document.getElementById('tunnel-start-btn');
+  const stop = document.getElementById('tunnel-stop-btn');
+  if (!dot) return;
+  if (tunnelRunning && tunnelUrl) {
+    dot.className = 'tunnel-dot active';
+    txt.textContent = tunnelUrl;
+    if (copy)  copy.style.display = '';
+    if (start) start.style.display = 'none';
+    if (stop)  stop.style.display = '';
+  } else {
+    dot.className = 'tunnel-dot';
+    txt.textContent = 'Tunnel is not running';
+    if (copy)  copy.style.display = 'none';
+    if (start) start.style.display = '';
+    if (stop)  stop.style.display = 'none';
+  }
+}
+
+async function startTunnel() {
+  const txt = document.getElementById('tunnel-url-text');
+  if (txt) txt.textContent = 'Starting...';
+  document.getElementById('tunnel-start-btn').style.display = 'none';
+  try {
+    await api('/api/tunnel', { method: 'POST', body: { action: 'create', provider: 'cloudflared' } });
+  } catch (_) {}
+  let attempts = 0;
+  tunnelStartPolling = setInterval(async () => {
+    attempts++;
+    await loadTunnel();
+    _refreshTunnelSheet();
+    if (tunnelRunning && tunnelUrl) {
+      clearInterval(tunnelStartPolling); tunnelStartPolling = null;
+      showToast('Tunnel started \u2713', true);
+    } else if (attempts >= 15) {
+      clearInterval(tunnelStartPolling); tunnelStartPolling = null;
+      if (txt) txt.textContent = 'Tunnel failed to start. Check Cloudflare credentials.';
+      document.getElementById('tunnel-start-btn').style.display = '';
+    }
+  }, 2000);
+}
+
+async function stopTunnel() {
+  WebApp?.showConfirm('Stop the Cloudflare tunnel?', async (ok) => {
+    if (!ok) return;
+    try {
+      await api('/api/tunnel', { method: 'POST', body: { action: 'stop' } });
+      tunnelRunning = false; tunnelUrl = null;
+      _updateTunnelBadge();
+      _refreshTunnelSheet();
+      showToast('Tunnel stopped', true);
+    } catch (e) { showToast('Failed to stop tunnel', false); }
+  });
+}
+
+async function copyTunnelUrl() {
+  if (!tunnelUrl) return;
+  try {
+    await navigator.clipboard.writeText(tunnelUrl);
+  } catch (_) {
+    prompt('Copy this URL:', tunnelUrl);
+  }
+  showToast('URL copied \u2713', true);
+  WebApp?.HapticFeedback?.impactOccurred('light');
+}
+
 // ─── INIT ────────────────────────────────────────────────────────────────────
 (async function init() {
   if (WebApp) {
@@ -1355,6 +1745,7 @@ async function resetAgent() {
   setConnDot('online');
   showApp();
   connectSocket();
+  loadTunnel();
   document.getElementById('feed-messages')?.addEventListener('scroll', () => scrollFeed(false));
 })();
 </script>
