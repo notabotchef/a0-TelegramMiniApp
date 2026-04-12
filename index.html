@@ -155,33 +155,36 @@ body {
   align-items: center;
   justify-content: center;
   flex: 1;
-  padding: 32px 24px calc(var(--safe-bottom) + 32px);
+  padding: 40px 24px calc(var(--safe-bottom) + 40px);
   gap: 0;
 }
 
-/* Logo mark */
+/* Full wordmark */
 .setup-logo {
-  margin-bottom: 20px;
+  margin-bottom: 32px;
 }
 .setup-logo svg {
   display: block;
+  max-width: 100%;
 }
 
-.setup-title {
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--text);
-  margin-bottom: 6px;
-  text-align: center;
-  letter-spacing: -.2px;
-}
 .setup-subtitle {
   font-size: 12px;
   color: var(--hint);
   text-align: center;
-  margin-bottom: 28px;
-  line-height: 1.6;
-  max-width: 280px;
+  margin-bottom: 24px;
+  line-height: 1.7;
+  max-width: 260px;
+  letter-spacing: .1px;
+}
+
+.setup-divider {
+  width: 100%;
+  max-width: 320px;
+  height: 1px;
+  background: var(--border);
+  margin-bottom: 24px;
+  opacity: .4;
 }
 
 .setup-field {
@@ -193,27 +196,32 @@ body {
   display: block;
   font-size: 10px;
   font-weight: 600;
+  font-family: 'SF Mono', ui-monospace, 'Fira Code', Menlo, monospace;
   color: var(--hint);
-  letter-spacing: .6px;
+  letter-spacing: .9px;
   text-transform: uppercase;
-  margin-bottom: 6px;
+  margin-bottom: 7px;
 }
 .setup-field input {
   width: 100%;
-  background: var(--sec-bg);
-  border: 1px solid var(--border);
-  border-radius: 12px;
+  background: rgba(255,255,255,.04);
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 10px;
   padding: 13px 16px;
   color: var(--text);
-  font-family: inherit;
-  font-size: 14px;
+  font-family: 'SF Mono', ui-monospace, 'Fira Code', Menlo, monospace;
+  font-size: 13px;
+  letter-spacing: -.1px;
   outline: none;
-  transition: border-color .15s;
+  transition: border-color .2s, background .2s;
   -webkit-appearance: none;
   appearance: none;
 }
-.setup-field input::placeholder { color: var(--hint); }
-.setup-field input:focus { border-color: var(--accent); }
+.setup-field input::placeholder { color: var(--hint); opacity: .45; }
+.setup-field input:focus {
+  border-color: rgba(34,197,94,.45);
+  background: rgba(34,197,94,.04);
+}
 .setup-field input.error { border-color: var(--destructive); }
 
 .setup-hint {
@@ -221,17 +229,11 @@ body {
   max-width: 320px;
   font-size: 11px;
   color: var(--hint);
-  line-height: 1.5;
+  line-height: 1.6;
   margin-bottom: 20px;
   display: flex;
   align-items: flex-start;
-  gap: 6px;
-}
-.setup-hint::before {
-  content: "🔐";
-  font-size: 12px;
-  flex-shrink: 0;
-  margin-top: 1px;
+  gap: 7px;
 }
 
 #setup-error {
@@ -255,16 +257,17 @@ body {
   background: var(--accent);
   color: var(--btn-text);
   border: none;
-  border-radius: 14px;
+  border-radius: 12px;
   font-family: inherit;
   font-size: 15px;
   font-weight: 700;
+  letter-spacing: .2px;
   cursor: pointer;
   transition: opacity .15s, transform .1s;
   -webkit-tap-highlight-color: transparent;
 }
 #connect-btn:disabled {
-  opacity: .45;
+  opacity: .35;
   cursor: not-allowed;
 }
 #connect-btn:not(:disabled):active {
@@ -276,10 +279,12 @@ body {
   font-size: 11px;
   color: var(--hint);
   text-align: center;
+  opacity: .55;
 }
 .setup-footer a {
   color: var(--accent);
   text-decoration: none;
+  opacity: 1;
 }
 
 /* ─── FEED TAB ─────────────────────────────────────────────────────────────── */
@@ -698,28 +703,23 @@ body {
 <!-- ─── SETUP PANEL ───────────────────────────────────────────────────────── -->
 <div id="setup-panel" style="display:none">
   <div class="setup-logo">
-    <!-- A0 logo: green hexagon with "A0" -->
-    <svg width="64" height="72" viewBox="0 0 64 72" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M32 2 L61 18 L61 54 L32 70 L3 54 L3 18 Z"
-            fill="rgba(34,197,94,.12)"
-            stroke="#22c55e"
-            stroke-width="1.5"/>
-      <text x="32" y="44"
-            text-anchor="middle"
-            font-family="SF Mono,Fira Code,Menlo,monospace"
-            font-size="20"
-            font-weight="700"
-            fill="#22c55e">A0</text>
+    <!-- Agent Zero full wordmark (a0-fullDark.svg) — designed for dark backgrounds -->
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 228 3271 983" width="220" height="66" aria-label="Agent Zero">
+      <defs><style>.st0{fill:#dedede}</style></defs>
+      <path d="M1009.95 1209.53c-125.1-214.98-250.74-430.9-378.92-651.16-126.82 219.73-251.81 436.28-376.62 652.51H60.69c190.42-329.11 570.87-981.75 570.87-981.75s382.11 651.12 572.49 980.41h-194.1Z" class="st0"/>
+      <path d="M875.46 1210.46H383.92c32.72-56.91 64.4-111.99 95.81-166.62H781.8c30.62 54.46 61.09 108.66 93.67 166.62zm1622.92-202.23c19.52 29.84 37.9 57.94 58.46 89.39h-63.61c-18.29-24.88-38.17-51.91-57.71-78.49h-72.24v78.17h-51.11V828.44c30.03 0 58.71-.22 87.38.06 23.48.24 47.32-1.26 70.37 2.21 37.67 5.66 66.94 25.71 74.9 64.9 8.22 40.54 1.62 78.35-35.52 104.62-3.14 2.22-6.21 4.54-10.93 7.99h.01Zm-135.01-40.37c34 0 66.71 1.87 99.08-.66 21.47-1.67 30.97-17.92 31.56-39.77.61-22.88-9.01-40.56-30.99-42.73-32.8-3.23-66.15-.84-99.65-.84zM1674.39 829.9v38.37c-52.36 58.82-104.25 117.13-160.14 179.91h158.93v49.49h-227.62v-51.9c46.98-52.11 95.02-105.41 147.93-164.09h-147.28V829.9zm906.29-489.95c64.48 63.91 125.11 123.99 189.35 187.65V373.68h47.4v271.19c-64.19-62.94-125.05-122.59-190.04-186.3v162.44h-46.72V339.94h.01Zm195.02 692.31c13.79-6.85 33.51-15.76 45.41-21.65 41.44 55.26 105.07 42.53 132.33 18s35.44-59.98 25.2-95.47c-13.36-34.33-42.97-61.14-86.36-59.62-43.38 1.52-81.55 32.41-85.2 84.34h-50.32c-.57-50.11 36.27-109.35 94.12-126.75 72.77-21.89 144.89 13.23 172.07 83.77 25.18 65.37-5.74 138.6-72.21 171-60.69 29.59-140.17 6.97-175.1-53.61h.04Zm-811.82-622.07c-11.07 8.4-24.55 17.68-34.13 24.95-55.99-46.33-119.62-30.88-142.33 27.28-13.63 38.17 6.27 88.2 48.2 103.62 36.45 13.4 76.82-.61 87.32-31.48-8.66-2.61-17.29-5.23-28.25-8.54-.93-12.84-1.85-25.67-2.96-40.9h96.82c7.25 56.02-37.39 118.12-94.41 132.17-63.06 15.54-129.35-19.2-152.31-79.83-22.64-59.76 4.81-131.25 61.88-161.16 55.93-29.3 126.75-15.37 160.17 33.88Zm-531.9-55.25c48.2 92.28 93.04 178.13 139.88 267.84h-53.47c-27.89-50.55-56.47-102.34-86.73-157.13-28.93 54.29-56.1 105.29-83.82 157.31h-54.54c45.87-88.68 90.79-175.5 138.65-268.02h.01Zm1642.09 60.65h-89.98v-46.22h226.22v46.24h-86.43v205.91h-49.82V415.59zM1947.89 878.34v65.77l63.09.91s-.03 30.03-.03 50.34c-25.69.89-53.1.45-78.35-5.53-21.38-5.05-36.73-22.63-37.67-46.05-1.5-36.98-.4-75.88-.4-115.24h216.51v49.81h-163.16Zm-52.88 218.57v-68.62c14.11-.65 27.22-1.25 40.97-1.87 3.47 7 3.06 19.81 9.96 20.09 6.88.29 107.67 0 164.04 0v50.41h-214.97Zm342.4-678.53v60.83l58.36.84s-.03 27.78-.03 46.57c-23.85.41-49.12.41-72.49-5.11-19.77-4.68-33.97-20.93-34.85-42.59-1.39-34.2-.37-70.19-.37-106.6h200.29v46.07H2237.4h.01Zm-48.91 202.2v-63.49c13.05-.6 25.18-1.15 37.9-1.73 3.2 6.48 2.83 18.32 9.2 18.59s99.6 0 151.75 0v46.63h-198.87.01Z" class="st0"/>
     </svg>
   </div>
 
-  <div class="setup-title">Agent Zero</div>
-  <div class="setup-subtitle">Enter your Agent Zero instance URL to get started.</div>
+  <div class="setup-subtitle">Enter your Agent Zero instance URL<br>to get started.</div>
+
+  <div class="setup-divider"></div>
 
   <div class="setup-field">
     <label for="url-input">Agent Zero URL</label>
     <input id="url-input"
-           type="url"
+           type="text"
+           inputmode="url"
            placeholder="https://your-agent-zero.com"
            autocomplete="off"
            autocorrect="off"
@@ -728,6 +728,7 @@ body {
   </div>
 
   <div class="setup-hint">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;opacity:.4;margin-top:1px"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
     No API key needed — your Telegram identity authenticates you automatically.
   </div>
 
@@ -736,8 +737,8 @@ body {
   <button id="connect-btn" disabled>Connect</button>
 
   <div class="setup-footer">
-    Need help? See the <a href="https://github.com/notabotchef/agent-zero-telegram-miniapp#readme" target="_blank" rel="noopener">setup guide</a>.
-    <br>v0.1.0 &middot; notabotchef/agent-zero-telegram-miniapp
+    Need help? See the <a href="https://github.com/notabotchef/a0-TelegramMiniApp#readme" target="_blank" rel="noopener">setup guide</a>.
+    <br>v0.1.0 &middot; notabotchef/a0-TelegramMiniApp
   </div>
 </div>
 
@@ -894,7 +895,7 @@ body {
 <div class="sheet-overlay" id="tunnel-overlay" onclick="closeTunnelSheet()"></div>
 <div class="bottom-sheet" id="tunnel-sheet">
   <div class="sheet-handle"></div>
-  <div class="sheet-title">Cloudflare Tunnel</div>
+  <div class="sheet-title">Tunnel</div>
   <div id="tunnel-status-row" class="tunnel-status-row">
     <span id="tunnel-dot" class="tunnel-dot"></span>
     <span id="tunnel-url-text" class="tunnel-url-text">Checking...</span>
@@ -914,8 +915,9 @@ body {
 const WebApp = window.Telegram?.WebApp;
 const CS     = WebApp?.CloudStorage;
 
-let baseUrl = '';    // e.g. "https://my-agent-zero.com" (no trailing slash)
-let apiKey  = '';    // received from /api/plugins/_miniapp/auth
+let baseUrl   = '';  // e.g. "https://my-agent-zero.com" (no trailing slash)
+let apiKey    = '';  // received from /api/plugins/_miniapp/auth
+let csrfToken = '';  // fetched from /api/csrf_token after auth — required for A0 POST endpoints
 let activeTab = 'feed';
 
 // ─── ESCAPE HELPER ─────────────────────────────────────────────────────────
@@ -1143,6 +1145,18 @@ function fetchWithTimeout(url, opts = {}, timeoutMs = 15000) {
     .finally(() => clearTimeout(tid));
 }
 
+// Bootstrap CSRF session with A0 — call once after successful auth.
+// A0 requires X-CSRF-Token on all POST endpoints (standard Flask CSRF protection).
+async function bootstrapCsrf() {
+  try {
+    const r = await fetchWithTimeout(baseUrl + '/api/csrf_token', {}, 6000);
+    if (r.ok) {
+      const data = await r.json().catch(() => ({}));
+      if (data.ok && data.token) csrfToken = data.token;
+    }
+  } catch (_) {}
+}
+
 async function testConnection(url) {
   try {
     const r = await fetchWithTimeout(
@@ -1202,6 +1216,7 @@ async function api(path, opts = {}) {
   const headers = {
     'Content-Type': 'application/json',
     'X-API-KEY':    apiKey,
+    ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
     ...(opts.headers || {}),
   };
   const r = await fetchWithTimeout(
@@ -1338,6 +1353,7 @@ connectBtn.addEventListener('click', async () => {
   }
 
   await saveConfig(rawUrl, hs.api_key);
+  await bootstrapCsrf();
   setConnDot('online');
   showApp();
   connectSocket();
@@ -1532,8 +1548,9 @@ async function resetAgent() {
 let chatList = [];
 let taskList = [];
 let manageLoadedAt = 0;
-let tunnelUrl = null;
-let tunnelRunning = false;
+let tunnelUrl      = null;
+let tunnelRunning  = false;
+let tunnelExternal = false;  // true when tunnel is external (not started by A0)
 let tunnelStartPolling = null;
 const MANAGE_CACHE_TTL = 30_000;
 
@@ -1689,8 +1706,16 @@ async function deleteTask(id, idx) {
 async function loadTunnel() {
   try {
     const data = await api('/api/tunnel', { method: 'POST', body: { action: 'get' } });
-    tunnelUrl = data?.tunnel_url || null;
+    tunnelUrl     = data?.tunnel_url || null;
     tunnelRunning = !!data?.is_running;
+    tunnelExternal = false;
+    // If A0 doesn't manage this tunnel but we're clearly behind one
+    // (baseUrl is not localhost), the tunnel IS the URL we're using.
+    if (!tunnelRunning && baseUrl && !/localhost|127\.0\.0\.1|0\.0\.0\.0/.test(baseUrl)) {
+      tunnelUrl      = baseUrl;
+      tunnelRunning  = true;
+      tunnelExternal = true;
+    }
     _updateTunnelBadge();
   } catch (_) { /* tunnel endpoint may not be reachable — silent */ }
 }
@@ -1732,7 +1757,8 @@ function _refreshTunnelSheet() {
     txt.textContent = tunnelUrl;
     if (copy)  copy.style.display = '';
     if (start) start.style.display = 'none';
-    if (stop)  stop.style.display = '';
+    // External tunnels can't be stopped from A0
+    if (stop)  stop.style.display = tunnelExternal ? 'none' : '';
   } else {
     dot.className = 'tunnel-dot';
     txt.textContent = 'Tunnel is not running';
@@ -1962,6 +1988,7 @@ function shellKeydown(e) {
 
   // Refresh stored api_key in case it changed
   await saveConfig(cfg.baseUrl, hs.api_key);
+  await bootstrapCsrf();
   setConnDot('online');
   showApp();
   connectSocket();
