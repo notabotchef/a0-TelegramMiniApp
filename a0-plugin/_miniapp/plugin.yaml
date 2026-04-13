@@ -1,5 +1,10 @@
 name: "miniapp"
+title: "Telegram Mini App"
 label: "Telegram Mini App"
 description: "Auth + shell bridge for the Agent Zero Telegram Mini App"
-version: "0.1.0"
+version: "0.2.0"
 enabled: true
+settings_sections:
+  - external
+per_project_config: false
+per_agent_config: false

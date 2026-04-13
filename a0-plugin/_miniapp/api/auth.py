@@ -62,6 +62,16 @@ def _get_telegram_config() -> tuple[list[str], list[int]]:
     return bot_tokens, list(allowed_ids)
 
 
+def _get_plugin_config() -> dict:
+    """Read _miniapp plugin config from A0 settings. Returns {} on any failure."""
+    try:
+        from python.helpers import settings as s
+        cfg = s.get_settings()
+        return cfg.get("plugins", {}).get("_miniapp", {})
+    except Exception:
+        return {}
+
+
 def _get_mcp_token() -> Optional[str]:
     """Retrieve the MCP server token from Agent Zero settings."""
     try:
@@ -149,28 +159,35 @@ async def execute(request: Any, context: Any = None) -> Any:
         pass
 
     init_data: str = body.get("init_data", "")
-    if not init_data:
-        return _json_response({"error": "init_data is required"}, 400)
 
-    # --- Get all bot tokens + allowed users (P2 + P1 fix) ---
-    bot_tokens, allowed_user_ids = _get_telegram_config()
-    if not bot_tokens:
-        return _json_response(
-            {"error": "Telegram plugin not found. Enable it in Agent Zero settings."},
-            503,
-        )
+    # --- Read plugin config to check require_auth ---
+    plugin_cfg  = _get_plugin_config()
+    require_auth = plugin_cfg.get("require_auth", True)
 
-    # --- Validate initData against all configured bot tokens (P2) ---
-    valid = any(_validate_init_data(init_data, tok) for tok in bot_tokens)
-    if not valid:
-        return _json_response({"error": "invalid signature"}, 401)
+    if require_auth:
+        if not init_data:
+            return _json_response({"error": "init_data is required"}, 400)
 
-    # --- Authorize Telegram user against allowed_users (P1) ---
-    # Extract user.id from the validated init_data
-    if allowed_user_ids:
-        telegram_user_id = _extract_user_id(init_data)
-        if telegram_user_id is None or telegram_user_id not in allowed_user_ids:
-            return _json_response({"error": "user not authorized"}, 403)
+        # --- Get all bot tokens + allowed users ---
+        bot_tokens, allowed_user_ids = _get_telegram_config()
+        if not bot_tokens:
+            return _json_response(
+                {"error": "Telegram plugin not found. Enable it in Agent Zero settings."},
+                503,
+            )
+
+        # --- Validate initData HMAC against all configured bot tokens ---
+        valid = any(_validate_init_data(init_data, tok) for tok in bot_tokens)
+        if not valid:
+            return _json_response({"error": "invalid signature"}, 401)
+
+        # --- Authorize Telegram user against allowed_users ---
+        if allowed_user_ids:
+            telegram_user_id = _extract_user_id(init_data)
+            if telegram_user_id is None or telegram_user_id not in allowed_user_ids:
+                return _json_response({"error": "user not authorized"}, 403)
+    # require_auth=false: skip initData check, issue api_key directly.
+    # Caller must still present X-API-KEY on subsequent requests.
 
     # --- Get MCP server token to hand back as api_key ---
     mcp_token = _get_mcp_token()

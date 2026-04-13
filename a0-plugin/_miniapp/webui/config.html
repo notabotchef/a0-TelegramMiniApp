@@ -1,0 +1,85 @@
+<html>
+<head>
+    <title>Telegram Mini App</title>
+</head>
+
+<body>
+    <div x-data>
+        <template x-if="config">
+            <div>
+                <div class="section-title">Telegram Mini App</div>
+                <div class="section-description">
+                    Configuration for the Telegram Mini App auth and shell bridge plugin.
+                </div>
+
+                <!-- Allowed Telegram Bots -->
+                <div class="field">
+                    <div class="field-label">
+                        <div class="field-title">Allowed Telegram Bots</div>
+                        <div class="field-description">
+                            Comma-separated list of Telegram bot names whose initData this plugin will accept.
+                            Must match bot names configured in the Telegram Integration plugin.
+                            Leave empty to accept any configured bot.
+                        </div>
+                    </div>
+                    <div class="field-control">
+                        <input type="text"
+                               x-effect="if (document.activeElement !== $el) $el.value = Array.isArray(config.allowed_telegram_bots) ? config.allowed_telegram_bots.join(', ') : ''"
+                               @change="config.allowed_telegram_bots = $event.target.value ? $event.target.value.split(',').map(s => s.trim()).filter(Boolean) : []"
+                               placeholder="bot_name_1, bot_name_2" />
+                    </div>
+                </div>
+
+                <!-- Require Auth -->
+                <div class="field">
+                    <div class="field-label">
+                        <div class="field-title">Require Authentication</div>
+                        <div class="field-description">
+                            Require Telegram initData validation for all requests.
+                            When disabled, Bearer token auth is still accepted as fallback.
+                        </div>
+                    </div>
+                    <div class="field-control">
+                        <label class="toggle">
+                            <input type="checkbox" x-model="config.require_auth" />
+                            <span class="toggler"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Shell Settings -->
+                <div class="section-title">Shell Execution</div>
+                <div class="section-description">
+                    Controls for shell command execution via the Mini App interface.
+                </div>
+
+                <div class="field">
+                    <div class="field-label">
+                        <div class="field-title">Shell Timeout</div>
+                        <div class="field-description">
+                            Maximum time in seconds to wait for a shell command to complete.
+                        </div>
+                    </div>
+                    <div class="field-control">
+                        <input type="number" min="1" max="300" x-model.number="config.shell_timeout" />
+                    </div>
+                </div>
+
+                <div class="field">
+                    <div class="field-label">
+                        <div class="field-title">Max Shell Output</div>
+                        <div class="field-description">
+                            Maximum number of characters returned from shell command output.
+                            Longer output is truncated to this limit.
+                        </div>
+                    </div>
+                    <div class="field-control">
+                        <input type="number" min="1000" max="500000" step="1000" x-model.number="config.shell_max_output" />
+                    </div>
+                </div>
+            </div>
+        </template>
+    </div>
+</body>
+
+</html>

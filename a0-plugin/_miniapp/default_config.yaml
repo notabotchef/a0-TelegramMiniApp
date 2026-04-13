@@ -2,3 +2,14 @@
 # Matches against bot names configured in the _telegram_integration plugin.
 # Leave empty to accept any bot configured in _telegram_integration.
 allowed_telegram_bots: []
+
+# Require Telegram initData validation for all requests.
+# When false, Bearer token auth is still accepted as fallback.
+require_auth: true
+
+# Shell command execution timeout in seconds.
+shell_timeout: 30
+
+# Maximum number of characters returned from shell output.
+# Longer output is truncated to this limit.
+shell_max_output: 50000
