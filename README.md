@@ -21,6 +21,8 @@ This is a plugin. Drop it in and it works — no build step, no extra config.
 cp -r a0-plugin/_miniapp /path/to/agent-zero/usr/plugins/
 ```
 
+> `a0-plugin/_miniapp/webui/index.html` is the Mini App frontend — it's included in the plugin directory.
+
 **Step 2 — Allow Telegram's origin**
 
 Add one line to your A0 `usr/.env`:
