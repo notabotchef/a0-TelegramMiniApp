@@ -22,9 +22,11 @@ def _get_telegram_config() -> tuple[list[str], list[int]]:
     bot_tokens: list[str] = []
     allowed_ids: set[int] = set()
     try:
-        from python.helpers import settings as s
-        cfg = s.get_settings()
-        tg = cfg.get("plugins", {}).get("_telegram_integration", {})
+        import json
+        from helpers import files
+        cfg_path = files.get_abs_path("usr/plugins/_telegram_integration/config.json")
+        with open(cfg_path) as f:
+            tg = json.load(f)
         for bot in tg.get("bots", []):
             if not bot.get("enabled", True):
                 continue
@@ -32,8 +34,9 @@ def _get_telegram_config() -> tuple[list[str], list[int]]:
             if token:
                 bot_tokens.append(token)
             for uid in bot.get("allowed_users", []):
+                # allowed_users can be "123456" strings or "@username" — skip usernames
                 try:
-                    allowed_ids.add(int(uid))
+                    allowed_ids.add(int(str(uid).strip()))
                 except (ValueError, TypeError):
                     pass
     except Exception:
