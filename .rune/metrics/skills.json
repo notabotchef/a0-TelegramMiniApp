@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "updated": "2026-04-13T01:38:16.776Z",
+  "skills": {
+    "plan": {
+      "total_invocations": 1,
+      "last_used": "2026-04-12"
+    },
+    "cook": {
+      "total_invocations": 1,
+      "last_used": "2026-04-12"
+    },
+    "completion-gate": {
+      "total_invocations": 1,
+      "last_used": "2026-04-12"
+    },
+    "sentinel": {
+      "total_invocations": 1,
+      "last_used": "2026-04-12"
+    },
+    "autopilot": {
+      "total_invocations": 1,
+      "last_used": "2026-04-12"
+    },
+    "design": {
+      "total_invocations": 1,
+      "last_used": "2026-04-12"
+    },
+    "debug": {
+      "total_invocations": 1,
+      "last_used": "2026-04-13"
+    }
+  }
+}
