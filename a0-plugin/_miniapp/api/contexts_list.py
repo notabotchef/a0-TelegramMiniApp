@@ -1,16 +1,19 @@
 """
 POST /api/plugins/_miniapp/contexts_list
-Returns list of saved context/chat files from A0's memory.
+Returns list of saved chat contexts from A0's usr/chats/ directory.
 Requires API key authentication (X-API-KEY header).
 
+A0 stores chats as: usr/chats/<id>/chat.json
+  { "id": "RYj73pK1", "name": "Chat title", "created_at": "...", ... }
+
 Input  (JSON body): {} (no parameters required)
-Output 200: { "ok": true, "contexts": [ { "id": "...", "title": "...", "active": true }, ... ] }
+Output 200: { "ok": true, "contexts": [ { "id": "...", "title": "...", "active": bool }, ... ] }
 """
 
 import json
 import os
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 # Requires API key — not a public endpoint
 skip_auth = False
@@ -18,79 +21,59 @@ skip_csrf = True
 
 
 async def execute(request: Any, context: Any = None) -> Any:
-    """
-    Handle POST /api/plugins/_miniapp/contexts_list.
-
-    Returns all known chat contexts: active in-memory + persisted on disk.
-    """
     contexts = []
+    seen: set = set()
 
-    # Strategy 1: get active in-memory contexts via AgentContext
+    # Strategy 1: active in-memory contexts via AgentContext
     try:
         from python.helpers.agent_context import AgentContext
         for ctx in AgentContext.get_all():
             contexts.append({
-                "id": ctx.id,
-                "title": f"Context {ctx.id[:8]}",
+                "id":     ctx.id,
+                "title":  getattr(ctx, "name", None) or f"Chat {ctx.id[:8]}",
                 "active": True,
             })
+            seen.add(ctx.id)
     except Exception:
         pass
 
-    # Strategy 2: scan chats directory for persisted context files
+    # Strategy 2: persisted chats — usr/chats/<id>/chat.json
+    # Each subdirectory is one chat; the JSON has keys: id, name, created_at, ...
     try:
         from python.helpers import files
-        chats_dir = files.get_abs_path("memory/chats")
+        chats_dir = files.get_abs_path("usr/chats")
         if os.path.isdir(chats_dir):
-            seen = {c["id"] for c in contexts}
-            for p in sorted(Path(chats_dir).iterdir(), key=lambda x: x.stat().st_mtime, reverse=True):
-                if p.suffix == ".json":
-                    try:
-                        with open(p) as f:
-                            data = json.load(f)
-                        if not isinstance(data, dict):
-                            # array/string payload — use filename as id
-                            cid = p.stem
-                            if cid not in seen:
-                                contexts.append({
-                                    "id": cid,
-                                    "title": f"Chat {cid[:8]}",
-                                    "active": False,
-                                })
-                                seen.add(cid)
-                            continue
-                        cid = data.get("id") or data.get("ctxid") or p.stem
-                        if cid not in seen:
-                            contexts.append({
-                                "id": cid,
-                                "title": data.get("title") or f"Chat {str(cid)[:8]}",
-                                "active": False,
-                            })
-                            seen.add(cid)
-                    except Exception:
-                        pass
-    except Exception:
-        pass
-
-    # Strategy 3: scan work_dir for context-like JSON files
-    try:
-        from python.helpers import files
-        workdir = files.get_abs_path("work_dir")
-        if os.path.isdir(workdir):
-            seen = {c["id"] for c in contexts}
-            for p in Path(workdir).glob("*.json"):
+            entries = sorted(
+                Path(chats_dir).iterdir(),
+                key=lambda x: x.stat().st_mtime,
+                reverse=True,
+            )
+            for entry in entries:
+                chat_file = entry / "chat.json"
+                if not (entry.is_dir() and chat_file.exists()):
+                    continue
                 try:
-                    with open(p) as f:
+                    with open(chat_file) as f:
                         data = json.load(f)
-                    if isinstance(data, dict) and ("id" in data or "ctxid" in data):
-                        cid = data.get("id") or data.get("ctxid") or p.stem
+                    if not isinstance(data, dict):
+                        # unexpected format — use dir name as id
+                        cid = entry.name
                         if cid not in seen:
                             contexts.append({
-                                "id": cid,
-                                "title": data.get("title") or f"Chat {str(cid)[:8]}",
+                                "id":     cid,
+                                "title":  f"Chat {cid[:8]}",
                                 "active": False,
                             })
                             seen.add(cid)
+                        continue
+                    cid = data.get("id") or entry.name
+                    if cid not in seen:
+                        contexts.append({
+                            "id":     cid,
+                            "title":  data.get("name") or data.get("title") or f"Chat {str(cid)[:8]}",
+                            "active": False,
+                        })
+                        seen.add(cid)
                 except Exception:
                     pass
     except Exception:
@@ -100,10 +83,6 @@ async def execute(request: Any, context: Any = None) -> Any:
 
 
 def _json_response(data: dict, status: int = 200) -> Any:
-    """
-    Return a JSON response. Works whether A0 expects a Flask Response
-    or a plain (body, status) tuple.
-    """
     try:
         from flask import jsonify
         resp = jsonify(data)
