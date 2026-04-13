@@ -48,6 +48,17 @@ async def execute(request: Any, context: Any = None) -> Any:
                     try:
                         with open(p) as f:
                             data = json.load(f)
+                        if not isinstance(data, dict):
+                            # array/string payload — use filename as id
+                            cid = p.stem
+                            if cid not in seen:
+                                contexts.append({
+                                    "id": cid,
+                                    "title": f"Chat {cid[:8]}",
+                                    "active": False,
+                                })
+                                seen.add(cid)
+                            continue
                         cid = data.get("id") or data.get("ctxid") or p.stem
                         if cid not in seen:
                             contexts.append({
