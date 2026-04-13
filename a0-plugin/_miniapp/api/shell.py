@@ -36,8 +36,18 @@ _BLOCKLIST_RE = [re.compile(p, re.IGNORECASE) for p in [
     r'\binit\s+[06]\b',
 ]]
 
-_MAX_OUTPUT = 50_000   # chars
-_TIMEOUT    = 30       # seconds
+_MAX_OUTPUT = 50_000   # chars (default — overridden by plugin config)
+_TIMEOUT    = 30       # seconds (default — overridden by plugin config)
+
+
+def _get_plugin_config() -> dict:
+    """Read _miniapp plugin config from A0 settings. Returns {} on any failure."""
+    try:
+        from python.helpers import settings as s
+        cfg = s.get_settings()
+        return cfg.get("plugins", {}).get("_miniapp", {})
+    except Exception:
+        return {}
 
 
 def _is_blocked(cmd: str) -> bool:
@@ -75,6 +85,11 @@ async def execute(request: Any, context: Any = None) -> Any:
     if _is_blocked(cmd):
         return _json_response({"error": "Command blocked for safety", "exit_code": -1}, 403)
 
+    # --- Read limits from plugin config (fall back to module defaults) ---
+    plugin_cfg = _get_plugin_config()
+    timeout    = int(plugin_cfg.get("shell_timeout",    _TIMEOUT))
+    max_output = int(plugin_cfg.get("shell_max_output", _MAX_OUTPUT))
+
     # --- Run subprocess ---
     start_ms = int(time.time() * 1000)
     try:
@@ -82,14 +97,14 @@ async def execute(request: Any, context: Any = None) -> Any:
             cmd,
             shell=True,
             capture_output=True,
-            timeout=_TIMEOUT,
+            timeout=timeout,
             cwd="/a0",
             env={**os.environ, "TERM": "xterm"},
         )
     except subprocess.TimeoutExpired:
         duration_ms = int(time.time() * 1000) - start_ms
         return _json_response(
-            {"error": f"Command timed out after {_TIMEOUT}s", "exit_code": -1, "duration_ms": duration_ms},
+            {"error": f"Command timed out after {timeout}s", "exit_code": -1, "duration_ms": duration_ms},
             408,
         )
     except FileNotFoundError:
@@ -102,14 +117,14 @@ async def execute(request: Any, context: Any = None) -> Any:
     stdout = result.stdout.decode("utf-8", errors="replace")
     stderr = result.stderr.decode("utf-8", errors="replace")
 
-    # Cap combined output
+    # Cap combined output to configured limit
     combined = len(stdout) + len(stderr)
-    if combined > _MAX_OUTPUT:
-        overflow = combined - _MAX_OUTPUT
+    if combined > max_output:
+        overflow = combined - max_output
         if len(stderr) >= overflow:
             stderr = stderr[: len(stderr) - overflow] + "\n[output truncated]"
         else:
-            remaining = _MAX_OUTPUT - len(stderr)
+            remaining = max_output - len(stderr)
             stdout = stdout[:remaining] + "\n[output truncated]"
 
     return _json_response(
