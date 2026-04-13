@@ -54,9 +54,8 @@ def _get_plugin_config() -> dict:
 
 def _get_mcp_token() -> Optional[str]:
     try:
-        from python.helpers import settings as s
-        cfg = s.get_settings()
-        return cfg.get("mcp_server_token") or cfg.get("api_key") or None
+        from helpers.settings import create_auth_token
+        return create_auth_token()
     except Exception:
         return None
 

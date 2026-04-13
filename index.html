@@ -955,29 +955,74 @@ let feedBuffer = [];         // items queued while paused
 let feedLineCount = 0;       // total rendered lines (cap at 200)
 let feedScrollAF = null;     // rAF handle for scroll debounce
 
-// Socket.IO event names — update if A0 uses different names
-const A0_EVENTS = {
-  THOUGHT:      'agent_thought',
-  TOOL:         'agent_tool',
-  TOOL_DONE:    'agent_tool_done',
-  RESPONSE:     'agent_response',
-  COMPLETE:     'agent_complete',
-  ERROR:        'agent_error',
+// A0 log type → feed item type mapping
+const A0_LOG_TYPE_MAP = {
+  agent:    { type: 'thought',      icon: '💭', label: 'Thought' },
+  tool:     { type: 'tool',         icon: '🔧', label: 'Tool' },
+  mcp:      { type: 'tool',         icon: '🔌', label: 'MCP' },
+  response: { type: 'response',     icon: '',   label: '' },
+  error:    { type: 'error',        icon: '⚠',  label: 'Error' },
+  warning:  { type: 'error',        icon: '⚠',  label: 'Warning' },
+  user:     { type: 'system_msg',   icon: '👤', label: 'User' },
+  subagent: { type: 'thought',      icon: '🤖', label: 'Subagent' },
+  code_exe: { type: 'tool',         icon: '⚙',  label: 'Code' },
+  browser:  { type: 'tool',         icon: '🌐', label: 'Browser' },
+  input:    { type: 'system_msg',   icon: '⏳', label: 'Waiting' },
+  progress: { type: 'system_msg',   icon: '⋯',  label: '' },
+  info:     { type: 'tool',         icon: '📋', label: '' },
+  hint:     { type: 'system_msg',   icon: '💡', label: '' },
+  util:     { type: 'system_msg',   icon: '',   label: '' },
 };
+
+let _feedContextId     = '';   // active context we're subscribed to
+let _feedHighWater     = -1;   // highest log item index rendered
+let _pendingFeedItem   = null; // { pos, item } — held until next item arrives or timeout
+let _pendingTimer      = null;
+let _lastFeedHeading   = '';   // dedup consecutive identical headings
+
+function _flushPendingItem() {
+    if (_pendingTimer)     { clearTimeout(_pendingTimer); _pendingTimer = null; }
+    if (!_pendingFeedItem) return;
+    const { item } = _pendingFeedItem;
+    _pendingFeedItem = null;
+    _renderLogItem(item);
+}
+
+function _tz() {
+  try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'; }
+  catch (_) { return 'UTC'; }
+}
+
+function _sendStateRequest(ctx, fromLog) {
+  socket.emit('state_request', {
+    context: ctx || '',
+    log_from: fromLog || 0,
+    notifications_from: 0,
+    timezone: _tz(),
+  });
+}
 
 // ─── SOCKET.IO ───────────────────────────────────────────────────────────────
 function connectSocket() {
   if (socket) return;
   try {
-    socket = io(baseUrl, {
+    // A0 Socket.IO lives on the /ws namespace; api_key authenticates the connection
+    socket = io(baseUrl + '/ws', {
       transports: ['websocket', 'polling'],
-      auth: { handlers: ['webui'] },
+      auth: { handlers: ['plugins/_miniapp/ws_miniapp'], api_key: apiKey },
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
     });
     socket.on('connect', () => {
       setConnDot('online');
+      _feedContextId   = '';
+      _feedHighWater   = -1;
+      _lastFeedHeading = '';
+      if (_pendingTimer) { clearTimeout(_pendingTimer); _pendingTimer = null; }
+      _pendingFeedItem = null;
       addFeedItem('system_msg', { label: 'Connected to Agent Zero' });
+      // First request: no context — A0 returns contexts list
+      _sendStateRequest('', 0);
     });
     socket.on('disconnect', (reason) => {
       setConnDot('offline');
@@ -987,23 +1032,92 @@ function connectSocket() {
       setConnDot('offline');
       addFeedItem('error', { label: 'Connection error', detail: err.message });
     });
-    // Agent Zero events
-    socket.on(A0_EVENTS.THOUGHT,   (d) => addFeedItem('thought',       { label: '\ud83d\udcad Thought', detail: d?.content || d?.text || JSON.stringify(d) }));
-    socket.on(A0_EVENTS.TOOL,      (d) => addFeedItem('tool',          { label: `\ud83d\udd27 ${d?.tool || d?.name || 'Tool'}`, detail: d?.label || d?.args || '' }));
-    socket.on(A0_EVENTS.TOOL_DONE, (d) => addFeedItem('tool_complete', { label: `\u2713 ${d?.tool || d?.name || 'Tool'} done`, detail: d?.result_summary || '' }));
-    socket.on(A0_EVENTS.RESPONSE,  (d) => addFeedItem('response',      { label: d?.content || d?.text || '' }));
-    socket.on(A0_EVENTS.COMPLETE,  (d) => addFeedItem('system_msg',    { label: '\u2014 response complete \u2014' }));
-    socket.on(A0_EVENTS.ERROR,     (d) => addFeedItem('error',         { label: '\u26a0 Error', detail: d?.message || d?.error || JSON.stringify(d) }));
-    // Catch-all: log unknown agent events to feed (helpful for verifying event names)
-    socket.onAny((event, ...args) => {
-      if (!Object.values(A0_EVENTS).includes(event)) {
-        if (event.startsWith('agent') || event.startsWith('a0')) {
-          addFeedItem('system_msg', { label: `[unknown event: ${event}]` });
+    // Main event: A0 pushes state snapshots with incremental log items
+    socket.on('state_push', (envelope) => {
+      const snap = envelope?.data?.snapshot;
+      if (!snap) return;
+
+      // Step 1: if we have no context yet, pick the most recent one from contexts list
+      if (!_feedContextId) {
+        const ctxs = snap.contexts;
+        const ctxId = (Array.isArray(ctxs) && ctxs.length > 0)
+          ? (ctxs[0].id || ctxs[0].context_id || '')
+          : '';
+        if (ctxId) {
+          _feedContextId = ctxId;
+          _sendStateRequest(_feedContextId, 0);  // subscribe to that context's logs
+          return;
+        }
+        return;  // no contexts yet — wait for next push
+      }
+
+      // Step 2: render incremental log items
+      const logs = snap.logs;
+      if (!Array.isArray(logs) || logs.length === 0) return;
+
+      // Compute absolute position of each item (log_version = total items = end index)
+      const logVersion = snap.log_version ?? 0;
+      const startPos   = logVersion - logs.length;
+
+      for (let i = 0; i < logs.length; i++) {
+        const pos    = startPos + i;
+        const isLast = i === logs.length - 1;
+
+        if (pos <= _feedHighWater) continue;
+
+        // New item arrived — finalize any pending older item
+        if (_pendingFeedItem && pos > _pendingFeedItem.pos) _flushPendingItem();
+
+        if (isLast) {
+          // Hold last item: it may still be streaming — render when next item arrives
+          _pendingFeedItem = { pos, item: logs[i] };
+          _feedHighWater   = pos;
+          if (_pendingTimer) clearTimeout(_pendingTimer);
+          // Flush after 1.5s of silence (step is complete, no more items coming)
+          _pendingTimer = setTimeout(_flushPendingItem, 1500);
+        } else {
+          _renderLogItem(logs[i]);
+          _feedHighWater = pos;
         }
       }
     });
   } catch (e) {
     addFeedItem('error', { label: 'Socket.IO init failed', detail: e.message });
+  }
+}
+
+function _renderLogItem(item) {
+  const logType = item?.type || 'info';
+
+  // Filter out pure-noise and response types (answer delivered via Telegram)
+  if (logType === 'progress' || logType === 'util' || logType === 'hint' || logType === 'user' || logType === 'response') return;
+
+  const map = A0_LOG_TYPE_MAP[logType] || { type: 'system_msg', icon: '', label: '' };
+  const heading = (item?.heading || '').trim();
+
+  // Always use heading only — never raw content (avoids JSON/markdown flooding)
+  if (!heading) return;
+
+  // Filter known streaming/noise patterns
+  if (heading.includes('|'))                      return;  // thinking progress bars
+  if (/^A0:\s*(Thinking|Calling LLM|None|\s*)/.test(heading)) return;
+  if (/^A0:\s*Responding/.test(heading))          return;  // user gets answer on Telegram
+  if (/^icon:\/\//.test(heading))                 return;  // icon:// protocol noise
+
+  // Deduplicate: skip if same heading as last rendered item (agent streams updates to same item)
+  if (heading === _lastFeedHeading) return;
+  _lastFeedHeading = heading;
+
+  if (map.type === 'response') {
+    addFeedItem('response', { label: heading });
+  } else if (map.type === 'thought') {
+    addFeedItem('thought', { label: `${map.icon} ${heading}` });
+  } else if (map.type === 'tool') {
+    addFeedItem('tool', { label: `${map.icon} ${heading}` });
+  } else if (map.type === 'error') {
+    addFeedItem('error', { label: `${map.icon} ${heading}` });
+  } else {
+    addFeedItem('system_msg', { label: heading });
   }
 }
 
@@ -1401,7 +1515,8 @@ function showToast(msg, success = true) {
 }
 
 // ─── CONFIG TAB ──────────────────────────────────────────────────────────────
-let currentModelConfig = null;
+let currentModelConfig  = null;
+let defaultModelConfig  = null;  // snapshot of config at page-load — used to deactivate presets
 let pluginList = [];
 let configLoadedAt = 0;
 const CONFIG_CACHE_TTL = 60_000; // 60s
@@ -1440,6 +1555,7 @@ async function loadModelConfig() {
   try {
     const data = await api('/api/plugins/_model_config/model_config_get', { method: 'POST', body: {} });
     currentModelConfig = data;
+    if (!defaultModelConfig) defaultModelConfig = JSON.parse(JSON.stringify(data));
     const cm = data?.config?.chat_model || {};
     el.innerHTML = `
       <div class="model-name">${esc(cm.name || 'Unknown')}</div>
@@ -1475,20 +1591,42 @@ async function applyPreset(idx) {
   const p = MODEL_PRESETS[idx];
   if (!p || !currentModelConfig) return;
   try {
-    const updated = {
-      ...currentModelConfig.config,
-      chat_model: { ...currentModelConfig.config?.chat_model, ...p.chat },
-      utility_model: { ...currentModelConfig.config?.utility_model, ...p.utility },
-    };
+    const cm = currentModelConfig.config?.chat_model || {};
+    const isActive = cm.provider === p.chatProvider && cm.name === p.chatName;
+
+    let updated, toastLabel, displayName, displayProvider, displayCtx;
+
+    if (isActive && defaultModelConfig) {
+      // Deactivate — restore default config
+      updated      = defaultModelConfig.config;
+      const dcm    = updated?.chat_model || {};
+      toastLabel   = 'Restored default model';
+      displayName  = dcm.name || 'Unknown';
+      displayProvider = dcm.provider || '';
+      displayCtx   = dcm.ctx_length;
+    } else {
+      // Activate preset
+      updated = {
+        ...currentModelConfig.config,
+        chat_model:     { ...currentModelConfig.config?.chat_model,     ...p.chat },
+        utility_model:  { ...currentModelConfig.config?.utility_model,  ...p.utility },
+      };
+      toastLabel   = `Preset \u2192 ${p.label}`;
+      displayName  = p.chatName;
+      displayProvider = p.chatProvider;
+      displayCtx   = p.chat.ctx_length;
+    }
+
     await api('/api/plugins/_model_config/model_config_set', { method: 'POST', body: { config: updated } });
     currentModelConfig = { ...currentModelConfig, config: updated };
-    showToast(`Preset \u2192 ${p.label}`, true);
-    renderModelPresets(p.chatProvider, p.chatName);
-    // Update current display
+    showToast(toastLabel, true);
+
+    const newCm = updated?.chat_model || {};
+    renderModelPresets(newCm.provider, newCm.name);
     const el = document.getElementById('model-current');
     if (el) el.innerHTML = `
-      <div class="model-name">${esc(p.chatName)}</div>
-      <div class="model-sub">${esc(p.chatProvider)}${p.chat.ctx_length ? ' \u00b7 ' + _fmtCtx(p.chat.ctx_length) : ''}</div>`;
+      <div class="model-name">${esc(displayName)}</div>
+      <div class="model-sub">${esc(displayProvider)}${displayCtx ? ' \u00b7 ' + _fmtCtx(displayCtx) : ''}</div>`;
   } catch (e) {
     showToast('Preset update failed', false);
   }
