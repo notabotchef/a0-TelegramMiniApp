@@ -63,6 +63,13 @@ body {
   align-items: center;
   gap: 10px;
 }
+#open-a0-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; border-radius: 8px; border: none;
+  background: rgba(255,255,255,.07); color: var(--text);
+  cursor: pointer; flex-shrink: 0;
+}
+#open-a0-btn:active { background: rgba(255,255,255,.15); }
 #conn-dot {
   width: 8px; height: 8px;
   border-radius: 50%;
@@ -753,6 +760,13 @@ body {
 <div id="app-header">
   <div class="header-title">Agent Zero</div>
   <div class="header-right">
+    <button id="open-a0-btn" onclick="openAgentZero()" title="Open Agent Zero">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+        <polyline points="15 3 21 3 21 9"/>
+        <line x1="10" y1="14" x2="21" y2="3"/>
+      </svg>
+    </button>
     <button class="tunnel-badge" id="tunnel-badge" onclick="openTunnelSheet()" title="Tunnel status">
       🌐 <span id="tunnel-badge-label">—</span>
     </button>
@@ -1764,6 +1778,16 @@ function _updateTunnelBadge() {
   } else {
     label.textContent = 'OFF';
     badge.classList.remove('active');
+  }
+}
+
+function openAgentZero() {
+  const url = baseUrl || tunnelUrl;
+  if (!url) return;
+  if (WebApp?.openLink) {
+    WebApp.openLink(url);
+  } else {
+    window.open(url, '_blank');
   }
 }
 
