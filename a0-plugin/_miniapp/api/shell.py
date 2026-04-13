@@ -1,16 +1,16 @@
 """
 POST /api/plugins/_miniapp/shell
-Requires X-API-KEY authentication (enforced by A0 framework — skip_auth NOT set).
+Requires X-API-KEY authentication.
 
 Input  (JSON body): { "cmd": str }
 Output 200: { "stdout": str, "stderr": str, "exit_code": int, "duration_ms": int }
 Output 400: { "error": "cmd is required" }
 Output 403: { "error": "Command blocked for safety" }
-Output 408: { "error": "Command timed out after 30s" }
+Output 408: { "error": "Command timed out after Ns" }
 Output 500: { "error": "Shell not available. Check Docker setup." }
 
-Safety: blocklist of destructive commands.
-Output capped at 50 000 chars combined.
+Blocked commands: rm -rf /, fork bombs, mkfs, dd if=, shutdown, reboot, halt, poweroff.
+Timeout and output cap are read from plugin config at request time.
 """
 
 import json
@@ -18,14 +18,14 @@ import os
 import re
 import subprocess
 import time
-from typing import Any
 
-# Regex patterns that must not match the command (case-insensitive)
-# Each entry is a compiled regex applied to the lowercased command.
+from helpers.api import ApiHandler, Input, Request, Response, Output
+
+
 _BLOCKLIST_RE = [re.compile(p, re.IGNORECASE) for p in [
-    r'rm\s+-rf\s+/\s*$',           # rm -rf /   (root only, not subdirs)
-    r'rm\s+-rf\s+/\*',             # rm -rf /*
-    r':\(\)\s*\{',                  # fork bomb: :(){
+    r'rm\s+-rf\s+/\s*$',
+    r'rm\s+-rf\s+/\*',
+    r':\(\)\s*\{',
     r'\bmkfs\b',
     r'\bdd\s+if\s*=',
     r'>\s*/dev/sd',
@@ -36,103 +36,89 @@ _BLOCKLIST_RE = [re.compile(p, re.IGNORECASE) for p in [
     r'\binit\s+[06]\b',
 ]]
 
-_MAX_OUTPUT = 50_000   # chars (default — overridden by plugin config)
-_TIMEOUT    = 30       # seconds (default — overridden by plugin config)
-
-
-def _get_plugin_config() -> dict:
-    """Read _miniapp plugin config from A0 settings. Returns {} on any failure."""
-    try:
-        from python.helpers import settings as s
-        cfg = s.get_settings()
-        return cfg.get("plugins", {}).get("_miniapp", {})
-    except Exception:
-        return {}
+_DEFAULT_TIMEOUT    = 30
+_DEFAULT_MAX_OUTPUT = 50_000
 
 
 def _is_blocked(cmd: str) -> bool:
     return any(p.search(cmd) for p in _BLOCKLIST_RE)
 
 
-def _json_response(data: dict, status: int = 200) -> Any:
+def _get_limits() -> tuple[int, int]:
     try:
-        from flask import jsonify
-        resp = jsonify(data)
-        resp.status_code = status
-        return resp
-    except Exception:
-        return json.dumps(data), status
-
-
-async def execute(request: Any, context: Any = None) -> Any:
-    """Handle POST /api/plugins/_miniapp/shell."""
-    # --- Parse body ---
-    body: dict = {}
-    try:
-        if hasattr(request, "get_json"):
-            body = request.get_json(force=True, silent=True) or {}
-        elif hasattr(request, "json"):
-            body = request.json or {}
-        elif isinstance(request, dict):
-            body = request
-    except Exception:
-        pass
-
-    cmd: str = body.get("cmd", "").strip()
-    if not cmd:
-        return _json_response({"error": "cmd is required"}, 400)
-
-    if _is_blocked(cmd):
-        return _json_response({"error": "Command blocked for safety", "exit_code": -1}, 403)
-
-    # --- Read limits from plugin config (fall back to module defaults) ---
-    plugin_cfg = _get_plugin_config()
-    timeout    = int(plugin_cfg.get("shell_timeout",    _TIMEOUT))
-    max_output = int(plugin_cfg.get("shell_max_output", _MAX_OUTPUT))
-
-    # --- Run subprocess ---
-    start_ms = int(time.time() * 1000)
-    try:
-        result = subprocess.run(
-            cmd,
-            shell=True,
-            capture_output=True,
-            timeout=timeout,
-            cwd="/a0",
-            env={**os.environ, "TERM": "xterm"},
+        from python.helpers import settings as s
+        cfg = s.get_settings().get("plugins", {}).get("_miniapp", {})
+        return (
+            int(cfg.get("shell_timeout",    _DEFAULT_TIMEOUT)),
+            int(cfg.get("shell_max_output", _DEFAULT_MAX_OUTPUT)),
         )
-    except subprocess.TimeoutExpired:
+    except Exception:
+        return _DEFAULT_TIMEOUT, _DEFAULT_MAX_OUTPUT
+
+
+class Shell(ApiHandler):
+
+    @classmethod
+    def requires_api_key(cls) -> bool:
+        return True
+
+    @classmethod
+    def requires_csrf(cls) -> bool:
+        return False
+
+    async def process(self, input: Input, request: Request) -> Output:
+        cmd: str = (input or {}).get("cmd", "").strip()
+        if not cmd:
+            return Response(
+                response=json.dumps({"error": "cmd is required"}),
+                status=400, mimetype="application/json")
+
+        if _is_blocked(cmd):
+            return Response(
+                response=json.dumps({"error": "Command blocked for safety", "exit_code": -1}),
+                status=403, mimetype="application/json")
+
+        timeout, max_output = _get_limits()
+
+        start_ms = int(time.time() * 1000)
+        try:
+            result = subprocess.run(
+                cmd, shell=True, capture_output=True,
+                timeout=timeout, cwd="/a0",
+                env={**os.environ, "TERM": "xterm"},
+            )
+        except subprocess.TimeoutExpired:
+            return Response(
+                response=json.dumps({
+                    "error": f"Command timed out after {timeout}s",
+                    "exit_code": -1,
+                    "duration_ms": int(time.time() * 1000) - start_ms,
+                }),
+                status=408, mimetype="application/json")
+        except FileNotFoundError:
+            return Response(
+                response=json.dumps({"error": "Shell not available. Check Docker setup."}),
+                status=500, mimetype="application/json")
+        except Exception as exc:
+            return Response(
+                response=json.dumps({"error": str(exc), "exit_code": -1}),
+                status=500, mimetype="application/json")
+
         duration_ms = int(time.time() * 1000) - start_ms
-        return _json_response(
-            {"error": f"Command timed out after {timeout}s", "exit_code": -1, "duration_ms": duration_ms},
-            408,
-        )
-    except FileNotFoundError:
-        return _json_response({"error": "Shell not available. Check Docker setup."}, 500)
-    except Exception as exc:
-        return _json_response({"error": str(exc), "exit_code": -1}, 500)
+        stdout = result.stdout.decode("utf-8", errors="replace")
+        stderr = result.stderr.decode("utf-8", errors="replace")
 
-    duration_ms = int(time.time() * 1000) - start_ms
+        combined = len(stdout) + len(stderr)
+        if combined > max_output:
+            overflow = combined - max_output
+            if len(stderr) >= overflow:
+                stderr = stderr[:len(stderr) - overflow] + "\n[output truncated]"
+            else:
+                stdout = stdout[:max_output - len(stderr)] + "\n[output truncated]"
 
-    stdout = result.stdout.decode("utf-8", errors="replace")
-    stderr = result.stderr.decode("utf-8", errors="replace")
-
-    # Cap combined output to configured limit
-    combined = len(stdout) + len(stderr)
-    if combined > max_output:
-        overflow = combined - max_output
-        if len(stderr) >= overflow:
-            stderr = stderr[: len(stderr) - overflow] + "\n[output truncated]"
-        else:
-            remaining = max_output - len(stderr)
-            stdout = stdout[:remaining] + "\n[output truncated]"
-
-    return _json_response(
-        {
+        return {
             "stdout": stdout,
             "stderr": stderr,
             "exit_code": result.returncode,
             "duration_ms": duration_ms,
-        },
-        200,
-    )
+        }
