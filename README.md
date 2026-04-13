@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="Screenshots/thumbnail.png" alt="Agent Zero Telegram Mini App" width="160">
+  <img src="Screenshots/logo.png" alt="Agent Zero Telegram Mini App" width="160">
 </p>
 
 <h1 align="center">Agent Zero Telegram Mini App</h1>
