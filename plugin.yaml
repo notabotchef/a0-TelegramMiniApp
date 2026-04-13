@@ -1,0 +1,9 @@
+name: _miniapp
+title: Telegram Mini App
+description: Auth + shell bridge that exposes Agent Zero as a Telegram Mini App with terminal-style streaming chat, Ed25519 initData auth, and a local gateway running over a Cloudflare tunnel.
+version: 0.2.0
+settings_sections:
+  - external
+per_project_config: false
+per_agent_config: false
+always_enabled: false
