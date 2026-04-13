@@ -1,0 +1,2022 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="version" content="0.1.0">
+<title>Agent Zero</title>
+<script src="https://telegram.org/js/telegram-web-app.js?62"></script>
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js" defer></script>
+<style>
+/* ─── CSS VARIABLES ──────────────────────────────────────────────────────── */
+:root {
+  --bg:         var(--tg-theme-bg-color,            #0d0d0d);
+  --text:       var(--tg-theme-text-color,          #e5e5e5);
+  --hint:       var(--tg-theme-hint-color,          #666);
+  --btn:        var(--tg-theme-button-color,        #22c55e);
+  --btn-text:   var(--tg-theme-button-text-color,   #0d0d0d);
+  --sec-bg:     var(--tg-theme-secondary-bg-color,  #111);
+  --hdr-bg:     var(--tg-theme-header_bg_color,     #0a0a0a);
+  --destructive:var(--tg-theme-destructive_text_color, #ef4444);
+  --accent:     #22c55e;
+  --border:     rgba(255,255,255,.08);
+  --safe-top:   var(--tg-safe-area-inset-top,    0px);
+  --safe-bottom:var(--tg-safe-area-inset-bottom, 0px);
+  --header-h:   calc(var(--safe-top) + 48px);
+  --tab-h:      52px;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; overflow: hidden; }
+body {
+  font-family: 'SF Mono','Fira Code','Cascadia Code','Menlo',monospace;
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ─── HEADER ─────────────────────────────────────────────────────────────── */
+#app-header {
+  display: none;                     /* hidden until app shown */
+  align-items: center;
+  justify-content: space-between;
+  height: var(--header-h);
+  padding: calc(var(--safe-top) + 8px) 16px 8px;
+  background: var(--hdr-bg);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  z-index: 10;
+}
+.header-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: .2px;
+}
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+#conn-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: #555;
+  transition: background .3s;
+  flex-shrink: 0;
+}
+#conn-dot.online  { background: var(--accent); }
+#conn-dot.offline { background: var(--destructive); }
+/* tunnel badge — replaced in Phase 4 */
+
+/* ─── TAB BAR ────────────────────────────────────────────────────────────── */
+#tab-bar {
+  display: none;                     /* hidden until app shown */
+  align-items: stretch;
+  height: var(--tab-h);
+  background: var(--hdr-bg);
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+  z-index: 10;
+  order: 99;                         /* pushed to bottom via flex */
+}
+.tab-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--hint);
+  transition: color .15s;
+  padding: 6px 4px calc(var(--safe-bottom) + 6px);
+  -webkit-tap-highlight-color: transparent;
+}
+.tab-btn.active { color: var(--accent); }
+.tab-btn.active .tab-icon { filter: drop-shadow(0 0 4px rgba(34,197,94,.4)); }
+/* active underline */
+.tab-btn { position: relative; }
+.tab-btn.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 20px; height: 2px;
+  background: var(--accent);
+  border-radius: 1px;
+}
+.tab-icon { font-size: 18px; line-height: 1; }
+.tab-label { font-size: 9px; font-weight: 600; letter-spacing: .3px; text-transform: uppercase; }
+
+/* ─── PANELS ─────────────────────────────────────────────────────────────── */
+#app-panel {
+  display: none;
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+.panel {
+  display: none;
+  height: 100%;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 16px;
+}
+.panel.active { display: block; }
+.panel::-webkit-scrollbar { width: 2px; }
+.panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,.08); border-radius: 2px; }
+
+/* placeholder content */
+.panel-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 8px;
+  color: var(--hint);
+}
+.panel-placeholder .p-icon { font-size: 36px; opacity: .4; }
+.panel-placeholder .p-label { font-size: 12px; letter-spacing: .5px; text-transform: uppercase; opacity: .4; }
+
+/* ─── SETUP PANEL ────────────────────────────────────────────────────────── */
+#setup-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  padding: 40px 24px calc(var(--safe-bottom) + 40px);
+  gap: 0;
+}
+
+/* Full wordmark */
+.setup-logo {
+  margin-bottom: 32px;
+}
+.setup-logo svg {
+  display: block;
+  max-width: 100%;
+}
+
+.setup-subtitle {
+  font-size: 12px;
+  color: var(--hint);
+  text-align: center;
+  margin-bottom: 24px;
+  line-height: 1.7;
+  max-width: 260px;
+  letter-spacing: .1px;
+}
+
+.setup-divider {
+  width: 100%;
+  max-width: 320px;
+  height: 1px;
+  background: var(--border);
+  margin-bottom: 24px;
+  opacity: .4;
+}
+
+.setup-field {
+  width: 100%;
+  max-width: 320px;
+  margin-bottom: 10px;
+}
+.setup-field label {
+  display: block;
+  font-size: 10px;
+  font-weight: 600;
+  font-family: 'SF Mono', ui-monospace, 'Fira Code', Menlo, monospace;
+  color: var(--hint);
+  letter-spacing: .9px;
+  text-transform: uppercase;
+  margin-bottom: 7px;
+}
+.setup-field input {
+  width: 100%;
+  background: rgba(255,255,255,.04);
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 10px;
+  padding: 13px 16px;
+  color: var(--text);
+  font-family: 'SF Mono', ui-monospace, 'Fira Code', Menlo, monospace;
+  font-size: 13px;
+  letter-spacing: -.1px;
+  outline: none;
+  transition: border-color .2s, background .2s;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.setup-field input::placeholder { color: var(--hint); opacity: .45; }
+.setup-field input:focus {
+  border-color: rgba(34,197,94,.45);
+  background: rgba(34,197,94,.04);
+}
+.setup-field input.error { border-color: var(--destructive); }
+
+.setup-hint {
+  width: 100%;
+  max-width: 320px;
+  font-size: 11px;
+  color: var(--hint);
+  line-height: 1.6;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+}
+
+#setup-error {
+  display: none;
+  width: 100%;
+  max-width: 320px;
+  font-size: 12px;
+  color: var(--destructive);
+  background: rgba(239,68,68,.08);
+  border: 1px solid rgba(239,68,68,.2);
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  line-height: 1.5;
+}
+
+#connect-btn {
+  width: 100%;
+  max-width: 320px;
+  height: 50px;
+  background: var(--accent);
+  color: var(--btn-text);
+  border: none;
+  border-radius: 12px;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: .2px;
+  cursor: pointer;
+  transition: opacity .15s, transform .1s;
+  -webkit-tap-highlight-color: transparent;
+}
+#connect-btn:disabled {
+  opacity: .35;
+  cursor: not-allowed;
+}
+#connect-btn:not(:disabled):active {
+  transform: scale(.97);
+}
+
+.setup-footer {
+  margin-top: 24px;
+  font-size: 11px;
+  color: var(--hint);
+  text-align: center;
+  opacity: .55;
+}
+.setup-footer a {
+  color: var(--accent);
+  text-decoration: none;
+  opacity: 1;
+}
+
+/* ─── FEED TAB ─────────────────────────────────────────────────────────────── */
+#feed-panel {
+  display: none; flex-direction: column; padding: 0; overflow: hidden;
+}
+#feed-panel.active { display: flex; }
+
+.feed-toolbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 14px; background: var(--hdr-bg);
+  border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+.feed-title { font-size: 12px; font-weight: 700; color: var(--text); letter-spacing: .3px; }
+.toolbar-right { display: flex; gap: 6px; }
+.toolbar-right button {
+  background: rgba(255,255,255,.06); border: none; color: var(--hint);
+  width: 28px; height: 28px; border-radius: 8px; font-size: 14px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.toolbar-right button:active { background: rgba(255,255,255,.12); }
+#pause-btn.paused { color: var(--accent); }
+
+.feed-messages {
+  flex: 1; overflow-y: auto; padding: 8px 0;
+  -webkit-overflow-scrolling: touch;
+}
+.feed-messages::-webkit-scrollbar { width: 2px; }
+.feed-messages::-webkit-scrollbar-thumb { background: rgba(255,255,255,.08); }
+
+.feed-empty {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  height: 100%; gap: 10px; color: var(--hint); font-size: 12px;
+}
+.feed-idle-dot {
+  width: 10px; height: 10px; border-radius: 50%; background: var(--accent);
+  animation: pulse 2s infinite;
+}
+
+/* Feed items */
+.feed-item {
+  display: flex; gap: 10px; padding: 6px 14px;
+  animation: feedIn 120ms ease-out;
+  border-left: 2px solid transparent; margin-bottom: 1px;
+}
+.feed-item .fi-time {
+  font-size: 10px; color: var(--hint); white-space: nowrap;
+  margin-top: 2px; min-width: 56px; font-variant-numeric: tabular-nums;
+}
+.feed-item .fi-body { flex: 1; min-width: 0; }
+.feed-item .fi-label {
+  font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: 2px;
+}
+.feed-item .fi-detail {
+  font-size: 11px; color: var(--hint); word-break: break-word;
+  white-space: pre-wrap;
+}
+.feed-item.thought { border-left-color: rgba(129,140,248,.4); }
+.feed-item.thought .fi-label { color: var(--accent-text, #818cf8); font-style: italic; font-weight: 400; }
+.feed-item.tool { border-left-color: var(--accent); }
+.feed-item.tool .fi-label { color: var(--accent); }
+.feed-item.tool_complete { border-left-color: rgba(34,197,94,.3); }
+.feed-item.tool_complete .fi-label { color: var(--hint); }
+.feed-item.response { border-left-color: rgba(255,255,255,.1); }
+.feed-item.error { border-left-color: var(--destructive); }
+.feed-item.error .fi-label { color: var(--destructive); }
+.feed-item.system_msg { border-left-color: transparent; }
+.feed-item.system_msg .fi-label { color: var(--hint); font-size: 11px; font-style: italic; }
+
+.feed-paused-banner {
+  position: sticky; top: 0; z-index: 5;
+  background: rgba(234,179,8,.15); border-bottom: 1px solid rgba(234,179,8,.3);
+  color: #fbbf24; font-size: 11px; text-align: center; padding: 5px;
+  display: none;
+}
+.feed-paused-banner.visible { display: block; }
+
+.scroll-btn {
+  display: none; position: absolute; bottom: 12px; right: 12px;
+  width: 36px; height: 36px; border-radius: 50%;
+  background: var(--sec-bg); border: 1px solid var(--border);
+  color: var(--text); font-size: 16px; cursor: pointer;
+  align-items: center; justify-content: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,.4); z-index: 5;
+}
+.scroll-btn.visible { display: flex; }
+
+@keyframes feedIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: .3; }
+}
+
+/* ─── CONFIG TAB ────────────────────────────────────────────────────────────── */
+#config-panel { padding: 0; }
+.panel-scroll { overflow-y: auto; height: 100%; -webkit-overflow-scrolling: touch; }
+.panel-scroll::-webkit-scrollbar { width: 2px; }
+.panel-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,.08); }
+
+.section {
+  margin: 12px; border-radius: 12px;
+  background: var(--sec-bg); overflow: hidden;
+  border: 1px solid var(--border);
+}
+.section-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px 6px;
+  border-bottom: 1px solid var(--border);
+}
+.section-header h2 {
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .6px; color: var(--hint); margin: 0;
+}
+.badge {
+  font-size: 10px; font-weight: 700; background: rgba(255,255,255,.08);
+  color: var(--hint); padding: 2px 7px; border-radius: 10px;
+}
+
+/* Model section */
+.model-current {
+  padding: 10px 14px 6px;
+}
+.model-name {
+  font-size: 14px; font-weight: 700; color: var(--text);
+}
+.model-sub {
+  font-size: 11px; color: var(--hint); margin-top: 2px;
+}
+.model-loading, .plugin-loading {
+  padding: 14px; font-size: 12px; color: var(--hint); text-align: center;
+}
+.model-presets {
+  display: flex; flex-wrap: wrap; gap: 6px; padding: 6px 14px 12px;
+}
+.model-chip {
+  padding: 8px 12px; border-radius: 12px; font-size: 11px;
+  border: 1px solid var(--border); background: transparent;
+  color: var(--hint); cursor: pointer; transition: all .15s;
+  text-align: left; min-width: 0; flex: 1 1 calc(50% - 4px);
+}
+.model-chip:active { opacity: .7; }
+.model-chip.active {
+  border-color: var(--accent); color: var(--accent);
+  background: rgba(34,197,94,.1);
+}
+.model-chip .chip-label { font-weight: 600; display: block; }
+.model-chip .chip-sub { font-size: 10px; opacity: .6; display: block; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Plugin list */
+.plugin-list { padding: 4px 0; }
+.plugin-card {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; border-bottom: 1px solid var(--border);
+}
+.plugin-card:last-child { border-bottom: none; }
+.plugin-icon { font-size: 18px; flex-shrink: 0; width: 28px; text-align: center; }
+.plugin-info { flex: 1; min-width: 0; }
+.plugin-name { font-size: 13px; font-weight: 600; color: var(--text); }
+.plugin-desc { font-size: 11px; color: var(--hint); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* iOS-style toggle */
+.toggle-wrap { flex-shrink: 0; }
+.toggle {
+  position: relative; display: inline-block; width: 44px; height: 26px;
+}
+.toggle input { opacity: 0; width: 0; height: 0; position: absolute; }
+.toggle-track {
+  position: absolute; inset: 0; border-radius: 13px;
+  background: rgba(255,255,255,.12); transition: background .2s; cursor: pointer;
+}
+.toggle input:checked + .toggle-track { background: var(--accent); }
+.toggle-thumb {
+  position: absolute; width: 20px; height: 20px; border-radius: 50%;
+  background: #fff; top: 3px; left: 3px; transition: transform .2s;
+  pointer-events: none; box-shadow: 0 1px 3px rgba(0,0,0,.4);
+}
+.toggle input:checked ~ .toggle-thumb { transform: translateX(18px); }
+
+/* Reset button */
+.reset-btn {
+  width: 100%; padding: 12px; border-radius: 10px;
+  background: rgba(239,68,68,.12); border: 1px solid rgba(239,68,68,.25);
+  color: #ef4444; font-size: 14px; font-weight: 700; cursor: pointer;
+  transition: background .15s;
+}
+.reset-btn:active { background: rgba(239,68,68,.22); }
+.reset-hint { font-size: 11px; color: var(--hint); text-align: center; margin-top: 6px; }
+
+/* Toast */
+.toast {
+  position: fixed; top: calc(var(--safe-top) + 54px); left: 50%; transform: translateX(-50%);
+  background: rgba(30,30,30,.95); color: var(--text); padding: 8px 16px;
+  border-radius: 20px; font-size: 12px; font-weight: 600; z-index: 100;
+  opacity: 0; transition: opacity .2s; pointer-events: none; white-space: nowrap;
+  border: 1px solid var(--border);
+}
+.toast.visible { opacity: 1; }
+.toast.success { border-color: rgba(34,197,94,.4); color: var(--accent); }
+
+/* ─── MANAGE TAB ────────────────────────────────────────────────────────────── */
+#manage-panel { padding: 0; }
+
+.section-action-btn {
+  font-size: 11px; font-weight: 700; color: var(--accent);
+  background: rgba(34,197,94,.1); border: 1px solid rgba(34,197,94,.25);
+  padding: 4px 10px; border-radius: 8px; cursor: pointer;
+}
+.section-action-btn:active { opacity: .7; }
+
+.item-list { padding: 4px 0; }
+.list-loading { padding: 14px; font-size: 12px; color: var(--hint); text-align: center; }
+.list-empty { padding: 20px 14px; font-size: 12px; color: var(--hint); text-align: center; }
+
+/* Chat rows */
+.chat-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; border-bottom: 1px solid var(--border); cursor: pointer;
+}
+.chat-row:last-child { border-bottom: none; }
+.chat-row:active { background: rgba(255,255,255,.03); }
+.chat-icon { font-size: 16px; flex-shrink: 0; }
+.chat-info { flex: 1; min-width: 0; }
+.chat-title { font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chat-meta { font-size: 11px; color: var(--hint); margin-top: 1px; }
+.row-del-btn {
+  background: none; border: none; color: var(--hint); font-size: 16px; cursor: pointer;
+  padding: 4px 6px; border-radius: 6px; flex-shrink: 0;
+}
+.row-del-btn:active { color: var(--destructive); background: rgba(239,68,68,.1); }
+
+/* Task rows */
+.task-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; border-bottom: 1px solid var(--border);
+}
+.task-row:last-child { border-bottom: none; }
+.task-status-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+}
+.task-status-dot.running { background: var(--accent); animation: pulse 2s infinite; }
+.task-status-dot.idle    { background: #60a5fa; }
+.task-status-dot.disabled{ background: var(--hint); }
+.task-status-dot.failed  { background: var(--destructive); }
+.task-info { flex: 1; min-width: 0; }
+.task-name { font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.task-schedule { font-size: 11px; color: var(--hint); margin-top: 1px; }
+.task-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.task-btn {
+  font-size: 11px; font-weight: 700; padding: 4px 9px; border-radius: 7px;
+  border: 1px solid var(--border); background: rgba(255,255,255,.06); color: var(--hint); cursor: pointer;
+}
+.task-btn.run:active { background: rgba(34,197,94,.15); border-color: var(--accent); color: var(--accent); }
+.task-btn.del:active { background: rgba(239,68,68,.15); border-color: var(--destructive); color: var(--destructive); }
+
+/* Tunnel badge in header */
+.tunnel-badge {
+  display: flex; align-items: center; gap: 4px;
+  background: rgba(255,255,255,.06); border: 1px solid var(--border);
+  border-radius: 10px; padding: 3px 8px; font-size: 11px; color: var(--hint);
+  cursor: pointer; margin-left: 6px;
+}
+.tunnel-badge.active { border-color: rgba(34,197,94,.4); color: var(--accent); }
+.tunnel-badge:active { opacity: .7; }
+
+/* Bottom sheet */
+.sheet-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 60;
+  opacity: 0; pointer-events: none; transition: opacity .25s;
+}
+.sheet-overlay.open { opacity: 1; pointer-events: all; }
+.bottom-sheet {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 61;
+  background: var(--sec-bg); border-radius: 16px 16px 0 0;
+  padding: 0 16px calc(var(--safe-bottom) + 16px);
+  transform: translateY(100%); transition: transform .3s cubic-bezier(.4,0,.2,1);
+  border-top: 1px solid var(--border);
+}
+.bottom-sheet.open { transform: translateY(0); }
+.sheet-handle {
+  width: 36px; height: 4px; border-radius: 2px;
+  background: rgba(255,255,255,.15); margin: 10px auto 14px;
+}
+.sheet-title { font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 14px; }
+.tunnel-status-row { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+.tunnel-dot {
+  width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+  background: var(--hint);
+}
+.tunnel-dot.active { background: var(--accent); animation: pulse 2s infinite; }
+.tunnel-url-text { font-size: 12px; color: var(--text); font-family: monospace; word-break: break-all; }
+.sheet-actions { display: flex; gap: 8px; margin-bottom: 12px; }
+.sheet-btn {
+  flex: 1; padding: 11px; border-radius: 10px; font-size: 13px; font-weight: 700;
+  border: 1px solid var(--border); background: rgba(255,255,255,.06); color: var(--text); cursor: pointer;
+}
+.sheet-btn.accent { background: rgba(34,197,94,.12); border-color: rgba(34,197,94,.35); color: var(--accent); }
+.sheet-btn.danger { background: rgba(239,68,68,.1); border-color: rgba(239,68,68,.25); color: #ef4444; }
+.sheet-btn:active { opacity: .7; }
+.tunnel-hint { font-size: 11px; color: var(--hint); text-align: center; line-height: 1.4; }
+
+/* ─── SHELL TAB ─────────────────────────────────────────────────────────── */
+#shell-panel {
+  display: none; flex-direction: column; padding: 0; overflow: hidden;
+  height: 100%;
+}
+#shell-panel.active { display: flex; }
+
+.shell-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 7px 14px; background: var(--hdr-bg);
+  border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+.shell-cwd { font-size: 11px; color: var(--accent); font-family: inherit; }
+.shell-clear-btn {
+  background: rgba(255,255,255,.06); border: none; color: var(--hint);
+  padding: 4px 10px; border-radius: 7px; font-size: 11px; font-weight: 600;
+  cursor: pointer; font-family: inherit;
+}
+.shell-clear-btn:active { background: rgba(255,255,255,.12); }
+
+#shell-output {
+  flex: 1; overflow-y: auto;
+  background: #050505; color: #d4d4d4;
+  padding: 10px 12px;
+  font-size: 12px; line-height: 1.6;
+  -webkit-overflow-scrolling: touch;
+  word-break: break-word; white-space: pre-wrap;
+}
+#shell-output::-webkit-scrollbar { width: 2px; }
+#shell-output::-webkit-scrollbar-thumb { background: rgba(255,255,255,.08); }
+
+.shell-line { display: block; }
+.shell-line.cmd    { color: var(--accent); }
+.shell-line.stderr { color: #fbbf24; }
+.shell-line.exit-err { color: #ef4444; }
+.shell-line.meta   { color: var(--hint); font-style: italic; }
+
+.shell-welcome { color: var(--hint); font-style: italic; margin-bottom: 4px; display: block; }
+
+.shell-input-bar {
+  display: flex; align-items: center;
+  background: #050505; border-top: 1px solid var(--border);
+  padding: 8px 12px calc(var(--safe-bottom) + 8px);
+  flex-shrink: 0;
+}
+.shell-prompt { color: var(--accent); font-size: 13px; margin-right: 6px; flex-shrink: 0; }
+#shell-input {
+  flex: 1; background: transparent; border: none; outline: none;
+  color: #d4d4d4; font-family: inherit; font-size: 13px;
+  caret-color: var(--accent);
+  -webkit-appearance: none; appearance: none;
+}
+#shell-run {
+  background: rgba(34,197,94,.12); border: 1px solid rgba(34,197,94,.25);
+  color: var(--accent); font-size: 14px; font-weight: 700;
+  width: 32px; height: 32px; border-radius: 8px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; margin-left: 6px;
+}
+#shell-run:active { background: rgba(34,197,94,.25); }
+
+/* ─── NOT-TELEGRAM GATE ──────────────────────────────────────────────────── */
+#tg-gate {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  padding: 32px 24px;
+  gap: 12px;
+  text-align: center;
+}
+#tg-gate .gate-icon { font-size: 48px; }
+#tg-gate .gate-title { font-size: 18px; font-weight: 700; color: var(--text); }
+#tg-gate .gate-msg { font-size: 13px; color: var(--hint); line-height: 1.6; max-width: 280px; }
+
+/* ─── LOADING OVERLAY ────────────────────────────────────────────────────── */
+#loading-overlay {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  gap: 16px;
+}
+.spinner {
+  width: 32px; height: 32px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-label {
+  font-size: 12px;
+  color: var(--hint);
+  letter-spacing: .4px;
+}
+</style>
+</head>
+<body>
+
+<!-- ─── NOT-TELEGRAM GATE ─────────────────────────────────────────────────── -->
+<div id="tg-gate">
+  <div class="gate-icon">✈️</div>
+  <div class="gate-title">Open from Telegram</div>
+  <div class="gate-msg">This Mini App must be opened inside Telegram. Tap the menu button in your Agent Zero bot to launch it.</div>
+</div>
+
+<!-- ─── LOADING OVERLAY ───────────────────────────────────────────────────── -->
+<div id="loading-overlay">
+  <div class="spinner"></div>
+  <div class="loading-label" id="loading-label">Connecting…</div>
+</div>
+
+<!-- ─── SETUP PANEL ───────────────────────────────────────────────────────── -->
+<div id="setup-panel" style="display:none">
+  <div class="setup-logo">
+    <!-- Agent Zero full wordmark (a0-fullDark.svg) — designed for dark backgrounds -->
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 228 3271 983" width="220" height="66" aria-label="Agent Zero">
+      <defs><style>.st0{fill:#dedede}</style></defs>
+      <path d="M1009.95 1209.53c-125.1-214.98-250.74-430.9-378.92-651.16-126.82 219.73-251.81 436.28-376.62 652.51H60.69c190.42-329.11 570.87-981.75 570.87-981.75s382.11 651.12 572.49 980.41h-194.1Z" class="st0"/>
+      <path d="M875.46 1210.46H383.92c32.72-56.91 64.4-111.99 95.81-166.62H781.8c30.62 54.46 61.09 108.66 93.67 166.62zm1622.92-202.23c19.52 29.84 37.9 57.94 58.46 89.39h-63.61c-18.29-24.88-38.17-51.91-57.71-78.49h-72.24v78.17h-51.11V828.44c30.03 0 58.71-.22 87.38.06 23.48.24 47.32-1.26 70.37 2.21 37.67 5.66 66.94 25.71 74.9 64.9 8.22 40.54 1.62 78.35-35.52 104.62-3.14 2.22-6.21 4.54-10.93 7.99h.01Zm-135.01-40.37c34 0 66.71 1.87 99.08-.66 21.47-1.67 30.97-17.92 31.56-39.77.61-22.88-9.01-40.56-30.99-42.73-32.8-3.23-66.15-.84-99.65-.84zM1674.39 829.9v38.37c-52.36 58.82-104.25 117.13-160.14 179.91h158.93v49.49h-227.62v-51.9c46.98-52.11 95.02-105.41 147.93-164.09h-147.28V829.9zm906.29-489.95c64.48 63.91 125.11 123.99 189.35 187.65V373.68h47.4v271.19c-64.19-62.94-125.05-122.59-190.04-186.3v162.44h-46.72V339.94h.01Zm195.02 692.31c13.79-6.85 33.51-15.76 45.41-21.65 41.44 55.26 105.07 42.53 132.33 18s35.44-59.98 25.2-95.47c-13.36-34.33-42.97-61.14-86.36-59.62-43.38 1.52-81.55 32.41-85.2 84.34h-50.32c-.57-50.11 36.27-109.35 94.12-126.75 72.77-21.89 144.89 13.23 172.07 83.77 25.18 65.37-5.74 138.6-72.21 171-60.69 29.59-140.17 6.97-175.1-53.61h.04Zm-811.82-622.07c-11.07 8.4-24.55 17.68-34.13 24.95-55.99-46.33-119.62-30.88-142.33 27.28-13.63 38.17 6.27 88.2 48.2 103.62 36.45 13.4 76.82-.61 87.32-31.48-8.66-2.61-17.29-5.23-28.25-8.54-.93-12.84-1.85-25.67-2.96-40.9h96.82c7.25 56.02-37.39 118.12-94.41 132.17-63.06 15.54-129.35-19.2-152.31-79.83-22.64-59.76 4.81-131.25 61.88-161.16 55.93-29.3 126.75-15.37 160.17 33.88Zm-531.9-55.25c48.2 92.28 93.04 178.13 139.88 267.84h-53.47c-27.89-50.55-56.47-102.34-86.73-157.13-28.93 54.29-56.1 105.29-83.82 157.31h-54.54c45.87-88.68 90.79-175.5 138.65-268.02h.01Zm1642.09 60.65h-89.98v-46.22h226.22v46.24h-86.43v205.91h-49.82V415.59zM1947.89 878.34v65.77l63.09.91s-.03 30.03-.03 50.34c-25.69.89-53.1.45-78.35-5.53-21.38-5.05-36.73-22.63-37.67-46.05-1.5-36.98-.4-75.88-.4-115.24h216.51v49.81h-163.16Zm-52.88 218.57v-68.62c14.11-.65 27.22-1.25 40.97-1.87 3.47 7 3.06 19.81 9.96 20.09 6.88.29 107.67 0 164.04 0v50.41h-214.97Zm342.4-678.53v60.83l58.36.84s-.03 27.78-.03 46.57c-23.85.41-49.12.41-72.49-5.11-19.77-4.68-33.97-20.93-34.85-42.59-1.39-34.2-.37-70.19-.37-106.6h200.29v46.07H2237.4h.01Zm-48.91 202.2v-63.49c13.05-.6 25.18-1.15 37.9-1.73 3.2 6.48 2.83 18.32 9.2 18.59s99.6 0 151.75 0v46.63h-198.87.01Z" class="st0"/>
+    </svg>
+  </div>
+
+  <div class="setup-subtitle">Enter your Agent Zero instance URL<br>to get started.</div>
+
+  <div class="setup-divider"></div>
+
+  <div class="setup-field">
+    <label for="url-input">Agent Zero URL</label>
+    <input id="url-input"
+           type="text"
+           inputmode="url"
+           placeholder="https://your-agent-zero.com"
+           autocomplete="off"
+           autocorrect="off"
+           autocapitalize="none"
+           spellcheck="false">
+  </div>
+
+  <div class="setup-hint">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;opacity:.4;margin-top:1px"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+    No API key needed — your Telegram identity authenticates you automatically.
+  </div>
+
+  <div id="setup-error"></div>
+
+  <button id="connect-btn" disabled>Connect</button>
+
+  <div class="setup-footer">
+    Need help? See the <a href="https://github.com/notabotchef/a0-TelegramMiniApp#readme" target="_blank" rel="noopener">setup guide</a>.
+    <br>v0.1.0 &middot; notabotchef/a0-TelegramMiniApp
+  </div>
+</div>
+
+<!-- ─── HEADER (shown after auth) ─────────────────────────────────────────── -->
+<div id="app-header">
+  <div class="header-title">Agent Zero</div>
+  <div class="header-right">
+    <button class="tunnel-badge" id="tunnel-badge" onclick="openTunnelSheet()" title="Tunnel status">
+      🌐 <span id="tunnel-badge-label">—</span>
+    </button>
+    <span id="conn-dot"></span>
+  </div>
+</div>
+
+<!-- ─── MAIN APP PANEL ────────────────────────────────────────────────────── -->
+<div id="app-panel">
+
+  <!-- Feed Tab ⚡ -->
+  <div id="feed-panel" class="panel active">
+    <div class="feed-toolbar">
+      <span class="feed-title">⚡ Live Activity</span>
+      <div class="toolbar-right">
+        <button id="pause-btn" onclick="toggleFeedPause()" title="Pause feed">⏸</button>
+        <button id="clear-btn" onclick="clearFeed()" title="Clear feed">🗑</button>
+      </div>
+    </div>
+    <div class="feed-messages" id="feed-messages">
+      <div class="feed-paused-banner" id="feed-paused-banner"></div>
+      <!-- empty state -->
+      <div class="feed-empty" id="feed-empty">
+        <div class="feed-idle-dot"></div>
+        <span>Waiting for activity...</span>
+      </div>
+    </div>
+    <button class="scroll-btn" id="feed-scroll-btn" onclick="scrollFeed(true)">↓</button>
+  </div>
+
+  <!-- Config Tab ⚙ -->
+  <div id="config-panel" class="panel">
+    <div class="panel-scroll" id="config-scroll">
+
+      <!-- LLM MODEL SECTION -->
+      <div class="section">
+        <div class="section-header">
+          <h2>LLM Model</h2>
+        </div>
+        <div id="model-current" class="model-current">
+          <div class="model-loading">Loading...</div>
+        </div>
+        <div id="model-presets" class="model-presets">
+          <!-- Preset chips injected by JS -->
+        </div>
+      </div>
+
+      <!-- PLUGINS SECTION -->
+      <div class="section">
+        <div class="section-header">
+          <h2>Plugins</h2>
+          <span class="badge" id="plugins-badge"></span>
+        </div>
+        <div id="plugin-list" class="plugin-list">
+          <div class="plugin-loading">Loading...</div>
+        </div>
+      </div>
+
+      <!-- AGENT SECTION -->
+      <div class="section">
+        <div class="section-header"><h2>Agent</h2></div>
+        <div style="padding: 0 12px 12px;">
+          <button id="reset-btn" class="reset-btn" onclick="resetAgent()">
+            Reset Agent
+          </button>
+          <div class="reset-hint">Interrupts current tasks and resets agent state.</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Manage Tab 💬 -->
+  <div id="manage-panel" class="panel">
+    <div class="panel-scroll">
+
+      <div class="section">
+        <div class="section-header">
+          <h2>Conversations</h2>
+          <button class="section-action-btn" onclick="newChat()">+ New</button>
+        </div>
+        <div id="chat-list" class="item-list">
+          <div class="list-loading">Loading...</div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-header">
+          <h2>Scheduled Tasks</h2>
+          <span class="badge" id="tasks-badge"></span>
+        </div>
+        <div id="task-list" class="item-list">
+          <div class="list-loading">Loading...</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Shell Tab >_ -->
+  <div id="shell-panel" class="panel">
+    <div class="shell-header">
+      <span class="shell-cwd">/a0</span>
+      <button class="shell-clear-btn" onclick="clearShell()">Clear</button>
+    </div>
+    <div id="shell-output">
+      <span class="shell-welcome">Agent Zero Shell v0.1 — direct access to the Docker container</span>
+    </div>
+    <div class="shell-input-bar">
+      <span class="shell-prompt">$</span>
+      <input id="shell-input"
+             type="text"
+             placeholder="type a command..."
+             autocomplete="off"
+             autocorrect="off"
+             autocapitalize="none"
+             spellcheck="false"
+             onkeydown="shellKeydown(event)">
+      <button id="shell-run" onclick="runShell()" title="Run">↵</button>
+    </div>
+  </div>
+
+</div><!-- /#app-panel -->
+
+<!-- ─── TAB BAR ───────────────────────────────────────────────────────────── -->
+<div id="tab-bar">
+  <button class="tab-btn active" data-tab="feed"   onclick="switchTab('feed')">
+    <span class="tab-icon">⚡</span>
+    <span class="tab-label">Feed</span>
+  </button>
+  <button class="tab-btn"        data-tab="config" onclick="switchTab('config')">
+    <span class="tab-icon">⚙️</span>
+    <span class="tab-label">Config</span>
+  </button>
+  <button class="tab-btn"        data-tab="manage" onclick="switchTab('manage')">
+    <span class="tab-icon">💬</span>
+    <span class="tab-label">Manage</span>
+  </button>
+  <button class="tab-btn"        data-tab="shell"  onclick="switchTab('shell')">
+    <span class="tab-icon">&gt;_</span>
+    <span class="tab-label">Shell</span>
+  </button>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<div class="sheet-overlay" id="tunnel-overlay" onclick="closeTunnelSheet()"></div>
+<div class="bottom-sheet" id="tunnel-sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title">Tunnel</div>
+  <div id="tunnel-status-row" class="tunnel-status-row">
+    <span id="tunnel-dot" class="tunnel-dot"></span>
+    <span id="tunnel-url-text" class="tunnel-url-text">Checking...</span>
+  </div>
+  <div class="sheet-actions">
+    <button id="tunnel-copy-btn" class="sheet-btn" onclick="copyTunnelUrl()" style="display:none">📋 Copy URL</button>
+    <button id="tunnel-start-btn" class="sheet-btn accent" onclick="startTunnel()" style="display:none">Start Tunnel</button>
+    <button id="tunnel-stop-btn" class="sheet-btn danger" onclick="stopTunnel()" style="display:none">Stop Tunnel</button>
+  </div>
+  <div id="tunnel-hint" class="tunnel-hint">Set this URL as your Mini App URL in @BotFather → /setmenubutton</div>
+</div>
+
+<script>
+'use strict';
+
+// ─── GLOBALS ────────────────────────────────────────────────────────────────
+const WebApp = window.Telegram?.WebApp;
+const CS     = WebApp?.CloudStorage;
+
+let baseUrl   = '';  // e.g. "https://my-agent-zero.com" (no trailing slash)
+let apiKey    = '';  // received from /api/plugins/_miniapp/auth
+let csrfToken = '';  // fetched from /api/csrf_token after auth — required for A0 POST endpoints
+let activeTab = 'feed';
+
+// ─── ESCAPE HELPER ─────────────────────────────────────────────────────────
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+// ─── FEED STATE ──────────────────────────────────────────────────────────────
+let socket = null;
+let feedPaused = false;
+let feedBuffer = [];         // items queued while paused
+let feedLineCount = 0;       // total rendered lines (cap at 200)
+let feedScrollAF = null;     // rAF handle for scroll debounce
+
+// Socket.IO event names — update if A0 uses different names
+const A0_EVENTS = {
+  THOUGHT:      'agent_thought',
+  TOOL:         'agent_tool',
+  TOOL_DONE:    'agent_tool_done',
+  RESPONSE:     'agent_response',
+  COMPLETE:     'agent_complete',
+  ERROR:        'agent_error',
+};
+
+// ─── SOCKET.IO ───────────────────────────────────────────────────────────────
+function connectSocket() {
+  if (socket) return;
+  try {
+    socket = io(baseUrl, {
+      transports: ['websocket', 'polling'],
+      auth: { handlers: ['webui'] },
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+    });
+    socket.on('connect', () => {
+      setConnDot('online');
+      addFeedItem('system_msg', { label: 'Connected to Agent Zero' });
+    });
+    socket.on('disconnect', (reason) => {
+      setConnDot('offline');
+      addFeedItem('system_msg', { label: `Disconnected: ${reason}` });
+    });
+    socket.on('connect_error', (err) => {
+      setConnDot('offline');
+      addFeedItem('error', { label: 'Connection error', detail: err.message });
+    });
+    // Agent Zero events
+    socket.on(A0_EVENTS.THOUGHT,   (d) => addFeedItem('thought',       { label: '\ud83d\udcad Thought', detail: d?.content || d?.text || JSON.stringify(d) }));
+    socket.on(A0_EVENTS.TOOL,      (d) => addFeedItem('tool',          { label: `\ud83d\udd27 ${d?.tool || d?.name || 'Tool'}`, detail: d?.label || d?.args || '' }));
+    socket.on(A0_EVENTS.TOOL_DONE, (d) => addFeedItem('tool_complete', { label: `\u2713 ${d?.tool || d?.name || 'Tool'} done`, detail: d?.result_summary || '' }));
+    socket.on(A0_EVENTS.RESPONSE,  (d) => addFeedItem('response',      { label: d?.content || d?.text || '' }));
+    socket.on(A0_EVENTS.COMPLETE,  (d) => addFeedItem('system_msg',    { label: '\u2014 response complete \u2014' }));
+    socket.on(A0_EVENTS.ERROR,     (d) => addFeedItem('error',         { label: '\u26a0 Error', detail: d?.message || d?.error || JSON.stringify(d) }));
+    // Catch-all: log unknown agent events to feed (helpful for verifying event names)
+    socket.onAny((event, ...args) => {
+      if (!Object.values(A0_EVENTS).includes(event)) {
+        if (event.startsWith('agent') || event.startsWith('a0')) {
+          addFeedItem('system_msg', { label: `[unknown event: ${event}]` });
+        }
+      }
+    });
+  } catch (e) {
+    addFeedItem('error', { label: 'Socket.IO init failed', detail: e.message });
+  }
+}
+
+// ─── FEED RENDERING ──────────────────────────────────────────────────────────
+const FEED_MAX = 200;
+
+function addFeedItem(type, data) {
+  if (feedPaused) {
+    feedBuffer.push({ type, data });
+    if (feedBuffer.length > FEED_MAX) feedBuffer.shift(); // cap buffer, drop oldest
+    _updatePausedBanner();
+    return;
+  }
+  _renderFeedItem(type, data);
+}
+
+function _renderFeedItem(type, data) {
+  const empty = document.getElementById('feed-empty');
+  if (empty) empty.style.display = 'none';
+
+  const msgs = document.getElementById('feed-messages');
+  if (!msgs) return;
+
+  // Cap at 200 items
+  if (feedLineCount >= 200) {
+    const first = msgs.querySelector('.feed-item');
+    if (first) first.remove();
+  } else {
+    feedLineCount++;
+  }
+
+  const now = new Date();
+  const ts = now.toTimeString().slice(0, 8);  // HH:MM:SS
+
+  const div = document.createElement('div');
+  div.className = `feed-item ${type}`;
+
+  const label = esc(data.label || '');
+  const detail = data.detail ? `<div class="fi-detail">${esc(data.detail)}</div>` : '';
+
+  div.innerHTML = `
+    <div class="fi-time">${ts}</div>
+    <div class="fi-body">
+      <div class="fi-label">${label}</div>
+      ${detail}
+    </div>`;
+
+  msgs.appendChild(div);
+  _debouncedScrollFeed();
+}
+
+function _debouncedScrollFeed() {
+  if (feedScrollAF) cancelAnimationFrame(feedScrollAF);
+  feedScrollAF = requestAnimationFrame(() => scrollFeed(false));
+}
+
+function scrollFeed(force) {
+  const msgs = document.getElementById('feed-messages');
+  const btn = document.getElementById('feed-scroll-btn');
+  if (!msgs) return;
+  const distFromBottom = msgs.scrollHeight - msgs.scrollTop - msgs.clientHeight;
+  if (force || distFromBottom < 100) {
+    msgs.scrollTop = msgs.scrollHeight;
+    if (btn) btn.classList.remove('visible');
+  } else {
+    if (btn) btn.classList.add('visible');
+  }
+}
+
+function clearFeed() {
+  const msgs = document.getElementById('feed-messages');
+  if (!msgs) return;
+  msgs.querySelectorAll('.feed-item').forEach(el => el.remove());
+  feedLineCount = 0;
+  feedBuffer = [];
+  const empty = document.getElementById('feed-empty');
+  if (empty) empty.style.display = '';
+  _updatePausedBanner();
+}
+
+// ─── PAUSE / RESUME ──────────────────────────────────────────────────────────
+function toggleFeedPause() {
+  feedPaused = !feedPaused;
+  const btn = document.getElementById('pause-btn');
+  if (btn) {
+    btn.textContent = feedPaused ? '\u25b6' : '\u23f8';
+    btn.title = feedPaused ? 'Resume feed' : 'Pause feed';
+    btn.classList.toggle('paused', feedPaused);
+  }
+  if (!feedPaused) _flushFeedBuffer();
+  _updatePausedBanner();
+}
+
+function _flushFeedBuffer() {
+  function flush() {
+    const batch = feedBuffer.splice(0, 20);
+    if (!batch.length) return;
+    batch.forEach(({ type, data }) => _renderFeedItem(type, data));
+    if (feedBuffer.length) requestAnimationFrame(flush);
+  }
+  requestAnimationFrame(flush);
+}
+
+function _updatePausedBanner() {
+  const banner = document.getElementById('feed-paused-banner');
+  if (!banner) return;
+  if (feedPaused && feedBuffer.length > 0) {
+    banner.textContent = `Paused \u2014 ${feedBuffer.length} new event${feedBuffer.length !== 1 ? 's' : ''}`;
+    banner.classList.add('visible');
+  } else {
+    banner.classList.remove('visible');
+  }
+}
+
+// ─── STORAGE HELPERS ────────────────────────────────────────────────────────
+async function csGet(key) {
+  if (CS) {
+    try {
+      return await new Promise((res, rej) =>
+        CS.getItem(key, (err, val) => err ? rej(err) : res(val))
+      );
+    } catch (_) {}
+  }
+  try { return localStorage.getItem(key); } catch (_) { return null; }
+}
+
+async function csSet(key, value) {
+  if (CS) {
+    try {
+      await new Promise((res, rej) =>
+        CS.setItem(key, value, (err) => err ? rej(err) : res())
+      );
+      return;
+    } catch (_) {}
+  }
+  try { localStorage.setItem(key, value); } catch (_) {}
+}
+
+// ─── CONFIG ─────────────────────────────────────────────────────────────────
+async function loadConfig() {
+  const url = await csGet('a0_base_url');
+  const key = await csGet('a0_api_key');
+  if (url) baseUrl = url.replace(/\/+$/, '');
+  if (key) apiKey = key;
+  return url ? { baseUrl, apiKey } : null;
+}
+
+async function saveConfig(url, key) {
+  baseUrl = url.replace(/\/+$/, '');
+  apiKey  = key || '';
+  await csSet('a0_base_url', baseUrl);
+  if (key) await csSet('a0_api_key', apiKey);
+}
+
+// ─── FETCH HELPERS ──────────────────────────────────────────────────────────
+function fetchWithTimeout(url, opts = {}, timeoutMs = 15000) {
+  const controller = new AbortController();
+  const tid = setTimeout(() => controller.abort(), timeoutMs);
+  return fetch(url, { ...opts, signal: controller.signal })
+    .finally(() => clearTimeout(tid));
+}
+
+// Bootstrap CSRF session with A0 — call once after successful auth.
+// A0 requires X-CSRF-Token on all POST endpoints (standard Flask CSRF protection).
+async function bootstrapCsrf() {
+  try {
+    const r = await fetchWithTimeout(baseUrl + '/api/csrf_token', {}, 6000);
+    if (r.ok) {
+      const data = await r.json().catch(() => ({}));
+      if (data.ok && data.token) csrfToken = data.token;
+    }
+  } catch (_) {}
+}
+
+async function testConnection(url) {
+  try {
+    const r = await fetchWithTimeout(
+      url.replace(/\/+$/, '') + '/api/health',
+      {},
+      4000
+    );
+    if (r.ok) return { ok: true };
+    return { ok: false, error: `Server returned ${r.status}` };
+  } catch (e) {
+    if (e.name === 'AbortError') {
+      return { ok: false, error: 'Cannot reach Agent Zero — request timed out. Check the URL and that ALLOWED_ORIGINS is set on the server.' };
+    }
+    return { ok: false, error: 'Cannot reach Agent Zero. Check the URL and that ALLOWED_ORIGINS includes https://web.telegram.org.' };
+  }
+}
+
+async function doHandshake() {
+  try {
+    const initData = WebApp?.initData;
+    if (!initData) return { ok: false, error: 'No Telegram initData available' };
+
+    const r = await fetchWithTimeout(
+      baseUrl + '/api/plugins/_miniapp/auth',
+      {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ init_data: initData }),
+        // initData is discarded after this call — never stored
+      },
+      10000
+    );
+
+    const data = await r.json().catch(() => ({}));
+
+    if (r.status === 200 && data.api_key) {
+      return { ok: true, api_key: data.api_key };
+    }
+    if (r.status === 401) {
+      return { ok: false, error: 'Auth failed — is the Telegram plugin active with your bot?' };
+    }
+    if (r.status === 503) {
+      return { ok: false, error: data.error || 'Telegram plugin not found. Enable it in Agent Zero settings.' };
+    }
+    if (r.status === 500) {
+      return { ok: false, error: data.error || 'Agent Zero API key not configured. Set it in A0 settings.' };
+    }
+    return { ok: false, error: data.error || `Unexpected response (${r.status})` };
+  } catch (e) {
+    if (e.name === 'AbortError') return { ok: false, error: 'Auth request timed out.' };
+    return { ok: false, error: e.message || 'Auth request failed' };
+  }
+}
+
+// ─── API HELPER ─────────────────────────────────────────────────────────────
+async function api(path, opts = {}) {
+  const headers = {
+    'Content-Type': 'application/json',
+    'X-API-KEY':    apiKey,
+    ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
+    ...(opts.headers || {}),
+  };
+  const r = await fetchWithTimeout(
+    baseUrl + path,
+    {
+      method:  opts.method || 'POST',
+      headers,
+      body:    opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
+    },
+    opts.timeout || 15000
+  );
+  if (!r.ok) {
+    const msg = await r.text().catch(() => '');
+    throw new Error(`${r.status}: ${msg || r.statusText}`);
+  }
+  return r.json().catch(() => null);
+}
+
+// ─── TAB SWITCHING ──────────────────────────────────────────────────────────
+function switchTab(name) {
+  if (activeTab === name) return;
+  activeTab = name;
+
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.tab === name);
+  });
+  document.querySelectorAll('.panel').forEach(p => {
+    p.classList.toggle('active', p.id === name + '-panel');
+  });
+
+  if (name === 'config') loadConfigTab();
+  if (name === 'manage') loadManageTab();
+  if (name === 'shell')  setTimeout(() => document.getElementById('shell-input')?.focus(), 80);
+  WebApp?.HapticFeedback?.selectionChanged();
+}
+
+// ─── UI STATE TRANSITIONS ────────────────────────────────────────────────────
+function setLoading(label = 'Connecting…') {
+  document.getElementById('loading-overlay').style.display = 'flex';
+  document.getElementById('loading-label').textContent     = label;
+  document.getElementById('setup-panel').style.display     = 'none';
+  document.getElementById('tg-gate').style.display         = 'none';
+  document.getElementById('app-header').style.display      = 'none';
+  document.getElementById('app-panel').style.display       = 'none';
+  document.getElementById('tab-bar').style.display         = 'none';
+}
+
+function showSetup(errorMsg) {
+  document.getElementById('loading-overlay').style.display = 'none';
+  document.getElementById('tg-gate').style.display         = 'none';
+  document.getElementById('setup-panel').style.display     = 'flex';
+  document.getElementById('app-header').style.display      = 'none';
+  document.getElementById('app-panel').style.display       = 'none';
+  document.getElementById('tab-bar').style.display         = 'none';
+
+  if (errorMsg) setSetupError(errorMsg);
+}
+
+function showApp() {
+  document.getElementById('loading-overlay').style.display = 'none';
+  document.getElementById('setup-panel').style.display     = 'none';
+  document.getElementById('tg-gate').style.display         = 'none';
+  document.getElementById('app-header').style.display      = 'flex';
+  document.getElementById('app-panel').style.display       = 'block';
+  document.getElementById('tab-bar').style.display         = 'flex';
+}
+
+function showTgGate() {
+  document.getElementById('loading-overlay').style.display = 'none';
+  document.getElementById('setup-panel').style.display     = 'none';
+  document.getElementById('tg-gate').style.display         = 'flex';
+  document.getElementById('app-header').style.display      = 'none';
+  document.getElementById('app-panel').style.display       = 'none';
+  document.getElementById('tab-bar').style.display         = 'none';
+}
+
+function setSetupError(msg) {
+  const el = document.getElementById('setup-error');
+  if (msg) {
+    el.textContent = msg;
+    el.style.display = 'block';
+    document.getElementById('url-input').classList.add('error');
+  } else {
+    el.style.display = 'none';
+    document.getElementById('url-input').classList.remove('error');
+  }
+}
+
+function setConnDot(state) {
+  // state: 'online' | 'offline' | 'checking'
+  const dot = document.getElementById('conn-dot');
+  dot.className = '';
+  if (state === 'online')  dot.classList.add('online');
+  if (state === 'offline') dot.classList.add('offline');
+}
+
+// ─── SETUP SCREEN LOGIC ─────────────────────────────────────────────────────
+const urlInput   = document.getElementById('url-input');
+const connectBtn = document.getElementById('connect-btn');
+
+urlInput.addEventListener('input', () => {
+  setSetupError('');
+  connectBtn.disabled = !urlInput.value.trim();
+});
+
+urlInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !connectBtn.disabled) connectBtn.click();
+});
+
+connectBtn.addEventListener('click', async () => {
+  const rawUrl = urlInput.value.trim();
+  if (!rawUrl) return;
+
+  setSetupError('');
+  connectBtn.disabled = true;
+  connectBtn.textContent = 'Connecting…';
+
+  const health = await testConnection(rawUrl);
+  if (!health.ok) {
+    connectBtn.disabled  = false;
+    connectBtn.textContent = 'Connect';
+    setSetupError(health.error);
+    return;
+  }
+
+  // Temporarily set baseUrl for handshake
+  baseUrl = rawUrl.replace(/\/+$/, '');
+  const hs = await doHandshake();
+  if (!hs.ok) {
+    connectBtn.disabled  = false;
+    connectBtn.textContent = 'Connect';
+    setSetupError(hs.error);
+    return;
+  }
+
+  await saveConfig(rawUrl, hs.api_key);
+  await bootstrapCsrf();
+  setConnDot('online');
+  showApp();
+  connectSocket();
+  loadTunnel();
+  document.getElementById('feed-messages')?.addEventListener('scroll', () => scrollFeed(false));
+  WebApp?.HapticFeedback?.notificationOccurred('success');
+});
+
+// ─── TOAST ──────────────────────────────────────────────────────────────────
+function showToast(msg, success = true) {
+  let t = document.getElementById('toast');
+  if (!t) return;
+  t.textContent = msg;
+  t.className = 'toast visible' + (success ? ' success' : '');
+  clearTimeout(t._to);
+  t._to = setTimeout(() => t.classList.remove('visible'), 2500);
+}
+
+// ─── CONFIG TAB ──────────────────────────────────────────────────────────────
+let currentModelConfig = null;
+let pluginList = [];
+let configLoadedAt = 0;
+const CONFIG_CACHE_TTL = 60_000; // 60s
+
+let MODEL_PRESETS = []; // loaded dynamically from A0 presets.yaml
+
+async function loadConfigTab() {
+  if (Date.now() - configLoadedAt < CONFIG_CACHE_TTL) return;
+  await loadModelPresets(); // fetch presets before rendering model config
+  await Promise.allSettled([loadModelConfig(), loadPlugins()]);
+  configLoadedAt = Date.now();
+}
+
+async function loadModelPresets() {
+  try {
+    const data = await api('/api/plugins/_miniapp/presets', { method: 'POST', body: {} });
+    const raw = data?.presets || [];
+    MODEL_PRESETS = raw.map(p => ({
+      label: p.name || 'Unnamed',
+      chatProvider: p.chat?.provider || '',
+      chatName: p.chat?.name || '',
+      utilityProvider: p.utility?.provider || '',
+      utilityName: p.utility?.name || '',
+      chat: p.chat || {},
+      utility: p.utility || {},
+    }));
+  } catch (_) {
+    MODEL_PRESETS = [];
+  }
+}
+
+// ── Model ─────────────────────────────────────────────────────────────────────
+async function loadModelConfig() {
+  const el = document.getElementById('model-current');
+  if (!el) return;
+  try {
+    const data = await api('/api/plugins/_model_config/model_config_get', { method: 'POST', body: {} });
+    currentModelConfig = data;
+    const cm = data?.config?.chat_model || {};
+    el.innerHTML = `
+      <div class="model-name">${esc(cm.name || 'Unknown')}</div>
+      <div class="model-sub">${esc(cm.provider || '')}${cm.ctx_length ? ' \u00b7 ' + _fmtCtx(cm.ctx_length) : ''}</div>`;
+    renderModelPresets(cm.provider, cm.name);
+  } catch (e) {
+    el.innerHTML = `<div class="model-loading">${e.message?.includes('404') ? 'Model Config plugin not installed' : 'Failed to load model'}</div>`;
+  }
+}
+
+function _fmtCtx(n) {
+  return n >= 1000 ? Math.round(n / 1000) + 'k ctx' : n + ' ctx';
+}
+
+function renderModelPresets(activeProvider, activeName) {
+  const wrap = document.getElementById('model-presets');
+  if (!wrap) return;
+  if (!MODEL_PRESETS.length) {
+    wrap.innerHTML = '<div class="model-loading">No presets found</div>';
+    return;
+  }
+  wrap.innerHTML = MODEL_PRESETS.map((p, i) => {
+    const isActive = p.chatProvider === activeProvider && p.chatName === activeName;
+    return `<button class="model-chip${isActive ? ' active' : ''}"
+      onclick="applyPreset(${i})">
+      <span class="chip-label">${esc(p.label)}</span>
+      <span class="chip-sub">${esc(p.chatProvider)} / ${esc(p.chatName)}</span>
+    </button>`;
+  }).join('');
+}
+
+async function applyPreset(idx) {
+  const p = MODEL_PRESETS[idx];
+  if (!p || !currentModelConfig) return;
+  try {
+    const updated = {
+      ...currentModelConfig.config,
+      chat_model: { ...currentModelConfig.config?.chat_model, ...p.chat },
+      utility_model: { ...currentModelConfig.config?.utility_model, ...p.utility },
+    };
+    await api('/api/plugins/_model_config/model_config_set', { method: 'POST', body: { config: updated } });
+    currentModelConfig = { ...currentModelConfig, config: updated };
+    showToast(`Preset \u2192 ${p.label}`, true);
+    renderModelPresets(p.chatProvider, p.chatName);
+    // Update current display
+    const el = document.getElementById('model-current');
+    if (el) el.innerHTML = `
+      <div class="model-name">${esc(p.chatName)}</div>
+      <div class="model-sub">${esc(p.chatProvider)}${p.chat.ctx_length ? ' \u00b7 ' + _fmtCtx(p.chat.ctx_length) : ''}</div>`;
+  } catch (e) {
+    showToast('Preset update failed', false);
+  }
+}
+
+// ── Plugins ───────────────────────────────────────────────────────────────────
+const PLUGIN_ICONS = {
+  '_telegram_integration': '\ud83d\udcf1',
+  '_model_config': '\ud83e\udde0',
+  '_code_execution': '\ud83d\udcbb',
+  '_memory': '\ud83d\uddc3',
+  '_scheduler': '\u23f0',
+  '_web_search': '\ud83d\udd0d',
+  '_knowledge_tool': '\ud83d\udcda',
+};
+
+async function loadPlugins() {
+  const el = document.getElementById('plugin-list');
+  const badge = document.getElementById('plugins-badge');
+  if (!el) return;
+  try {
+    const data = await api('/api/plugins_list', { method: 'POST', body: { filter: { custom: true } } });
+    // A0 returns { ok, plugins: [{ name, display_name, description, toggle_state, ... }] }
+    const raw = Array.isArray(data) ? data : (data?.plugins || data?.list || []);
+    pluginList = raw.map(p => ({
+      name: p.name || p,
+      label: p.display_name || p.label || p.name || p,
+      description: p.description || '',
+      // toggle_state: "enabled" | "disabled" | "advanced"; treat anything not "disabled" as enabled
+      enabled: (p.toggle_state || 'enabled') !== 'disabled',
+      alwaysEnabled: !!p.always_enabled,
+    }))
+    // Hide ourselves + _model_config (has dedicated section)
+    .filter(p => p.name !== '_miniapp' && p.name !== '_model_config');
+
+    if (badge) badge.textContent = pluginList.length;
+    renderPluginCards();
+  } catch (e) {
+    el.innerHTML = `<div class="plugin-loading">Failed to load plugins</div>`;
+  }
+}
+
+function renderPluginCards() {
+  const el = document.getElementById('plugin-list');
+  if (!el) return;
+  if (!pluginList.length) {
+    el.innerHTML = '<div class="plugin-loading">No plugins found</div>';
+    return;
+  }
+  el.innerHTML = pluginList.map((p, i) => {
+    const icon = PLUGIN_ICONS[p.name] || '\ud83d\udd0c';
+    const id = `toggle-${i}`;
+    // Prevent disabling always-enabled or critical plugins
+    const locked = p.alwaysEnabled || p.name === '_telegram_integration';
+    return `
+      <div class="plugin-card">
+        <div class="plugin-icon">${icon}</div>
+        <div class="plugin-info">
+          <div class="plugin-name">${esc(p.label)}</div>
+          ${p.description ? `<div class="plugin-desc">${esc(p.description)}</div>` : ''}
+        </div>
+        <div class="toggle-wrap">
+          <label class="toggle" title="${locked ? 'Required for auth' : ''}">
+            <input type="checkbox" id="${id}" ${p.enabled ? 'checked' : ''} ${locked ? 'disabled' : ''}
+              onchange="togglePlugin('${esc(p.name)}', ${i}, this.checked)">
+            <div class="toggle-track"></div>
+            <div class="toggle-thumb"></div>
+          </label>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+async function togglePlugin(name, idx, enable) {
+  // Optimistic already applied by checkbox state
+  try {
+    await api('/api/plugins', { method: 'POST', body: { action: 'toggle_plugin', plugin_name: name, enabled: enable } });
+    pluginList[idx].enabled = enable;
+    showToast(`${enable ? 'Enabled' : 'Disabled'} ${pluginList[idx].label}`, true);
+  } catch (e) {
+    // Revert
+    pluginList[idx].enabled = !enable;
+    const cb = document.getElementById(`toggle-${idx}`);
+    if (cb) cb.checked = !enable;
+    showToast(`Failed to toggle ${name}`, false);
+  }
+}
+
+// ── Reset ─────────────────────────────────────────────────────────────────────
+async function resetAgent() {
+  WebApp?.showConfirm('Reset Agent Zero?\n\nThis clears the agent cache.', async (ok) => {
+    if (!ok) return;
+    try {
+      await api('/api/plugins/_miniapp/reset', { method: 'POST', body: {} });
+      showToast('Agent reset \u2713', true);
+      WebApp?.HapticFeedback?.notificationOccurred('success');
+    } catch (e) {
+      showToast('Reset failed. Try again.', false);
+    }
+  });
+}
+
+// ─── MANAGE TAB ──────────────────────────────────────────────────────────────
+let chatList = [];
+let taskList = [];
+let manageLoadedAt = 0;
+let tunnelUrl      = null;
+let tunnelRunning  = false;
+let tunnelExternal = false;  // true when tunnel is external (not started by A0)
+let tunnelStartPolling = null;
+const MANAGE_CACHE_TTL = 30_000;
+
+async function loadManageTab() {
+  if (Date.now() - manageLoadedAt < MANAGE_CACHE_TTL) return;
+  await Promise.allSettled([loadChats(), loadTasks()]);
+  manageLoadedAt = Date.now();
+}
+
+// ── Chats ─────────────────────────────────────────────────────────────────────
+function _relativeDate(ts) {
+  if (!ts) return '';
+  const d = new Date(typeof ts === 'number' ? ts * 1000 : ts);
+  const diff = (Date.now() - d) / 1000;
+  if (diff < 3600)   return Math.round(diff/60) + 'm ago';
+  if (diff < 86400)  return Math.round(diff/3600) + 'h ago';
+  if (diff < 172800) return 'Yesterday';
+  return d.toLocaleDateString([], {month:'short', day:'numeric'});
+}
+
+async function loadChats() {
+  const el = document.getElementById('chat-list');
+  if (!el) return;
+  try {
+    const data = await api('/api/history_get', { method: 'POST', body: { context: '' } });
+    let contexts = [];
+    if (Array.isArray(data)) contexts = data;
+    else if (Array.isArray(data?.contexts)) contexts = data.contexts;
+    else if (Array.isArray(data?.history)) contexts = data.history;
+    else {
+      el.innerHTML = '<div class="list-empty">Chat list not available in this A0 version.</div>';
+      return;
+    }
+    chatList = contexts.map(c => ({
+      id: c.id || c.ctxid || c.context_id || c,
+      title: c.title || c.name || ('Conversation ' + (c.id || '').slice(0,6)),
+      created: c.created_at || c.created || c.timestamp || null,
+      messages: c.message_count || c.messages || null,
+    }));
+    renderChatList();
+  } catch (e) {
+    el.innerHTML = '<div class="list-empty">Could not load conversations.</div>';
+  }
+}
+
+function renderChatList() {
+  const el = document.getElementById('chat-list');
+  if (!el) return;
+  if (!chatList.length) {
+    el.innerHTML = '<div class="list-empty">No conversations yet.</div>';
+    return;
+  }
+  el.innerHTML = chatList.map((c, i) => `
+    <div class="chat-row">
+      <div class="chat-icon">💬</div>
+      <div class="chat-info">
+        <div class="chat-title">${esc(c.title)}</div>
+        <div class="chat-meta">${c.created ? _relativeDate(c.created) : ''}${c.messages ? ' \u00b7 ' + c.messages + ' msgs' : ''}</div>
+      </div>
+      <button class="row-del-btn" onclick="deleteChat('${esc(c.id)}',${i})" title="Delete">🗑</button>
+    </div>`).join('');
+}
+
+async function newChat() {
+  try {
+    const data = await api('/api/chat_create', { method: 'POST', body: {} });
+    const id = data?.ctxid || data?.id || '';
+    chatList.unshift({ id, title: 'New Conversation', created: Date.now()/1000, messages: 0 });
+    renderChatList();
+    showToast('New conversation created', true);
+    WebApp?.HapticFeedback?.impactOccurred('light');
+  } catch (e) { showToast('Failed to create chat', false); }
+}
+
+async function deleteChat(id, idx) {
+  WebApp?.showConfirm('Delete this conversation?', async (ok) => {
+    if (!ok) return;
+    try {
+      await api('/api/chat_remove', { method: 'POST', body: { context: id } });
+      chatList.splice(idx, 1);
+      renderChatList();
+      showToast('Conversation deleted', true);
+    } catch (e) { showToast('Failed to delete', false); }
+  });
+}
+
+// ── Scheduler ─────────────────────────────────────────────────────────────────
+function _taskDotClass(t) {
+  if (!t.enabled) return 'disabled';
+  if (t.status === 'running') return 'running';
+  if (t.status === 'failed' || t.status === 'error') return 'failed';
+  return 'idle';
+}
+
+async function loadTasks() {
+  const el = document.getElementById('task-list');
+  const badge = document.getElementById('tasks-badge');
+  if (!el) return;
+  try {
+    const data = await api('/api/scheduler_tasks_list', { method: 'POST', body: {} });
+    taskList = Array.isArray(data) ? data : (data?.tasks || data?.list || []);
+    if (badge) badge.textContent = taskList.length;
+    renderTaskList();
+  } catch (e) {
+    el.innerHTML = '<div class="list-empty">Could not load tasks.</div>';
+  }
+}
+
+function renderTaskList() {
+  const el = document.getElementById('task-list');
+  if (!el) return;
+  if (!taskList.length) {
+    el.innerHTML = '<div class="list-empty">No scheduled tasks.</div>';
+    return;
+  }
+  el.innerHTML = taskList.map((t, i) => `
+    <div class="task-row">
+      <div class="task-status-dot ${_taskDotClass(t)}"></div>
+      <div class="task-info">
+        <div class="task-name">${esc(t.name || t.id || 'Task')}</div>
+        <div class="task-schedule">${esc(t.schedule || t.schedule_display || '')}</div>
+      </div>
+      <div class="task-actions">
+        <button class="task-btn run" onclick="runTask('${esc(t.id)}',${i})">▶ Run</button>
+        <button class="task-btn del" onclick="deleteTask('${esc(t.id)}',${i})">🗑</button>
+      </div>
+    </div>`).join('');
+}
+
+async function runTask(id, idx) {
+  try {
+    await api('/api/scheduler_task_run', { method: 'POST', body: { id } });
+    showToast('Task triggered \u2713', true);
+    WebApp?.HapticFeedback?.impactOccurred('medium');
+  } catch (e) { showToast('Task trigger failed', false); }
+}
+
+async function deleteTask(id, idx) {
+  WebApp?.showConfirm('Delete this scheduled task?', async (ok) => {
+    if (!ok) return;
+    try {
+      await api('/api/scheduler_task_delete', { method: 'POST', body: { id } });
+      taskList.splice(idx, 1);
+      const badge = document.getElementById('tasks-badge');
+      if (badge) badge.textContent = taskList.length;
+      renderTaskList();
+      showToast('Task deleted', true);
+    } catch (e) { showToast('Failed to delete task', false); }
+  });
+}
+
+// ── Tunnel ────────────────────────────────────────────────────────────────────
+async function loadTunnel() {
+  try {
+    const data = await api('/api/tunnel', { method: 'POST', body: { action: 'get' } });
+    tunnelUrl     = data?.tunnel_url || null;
+    tunnelRunning = !!data?.is_running;
+    tunnelExternal = false;
+    // If A0 doesn't manage this tunnel but we're clearly behind one
+    // (baseUrl is not localhost), the tunnel IS the URL we're using.
+    if (!tunnelRunning && baseUrl && !/localhost|127\.0\.0\.1|0\.0\.0\.0/.test(baseUrl)) {
+      tunnelUrl      = baseUrl;
+      tunnelRunning  = true;
+      tunnelExternal = true;
+    }
+    _updateTunnelBadge();
+  } catch (_) { /* tunnel endpoint may not be reachable — silent */ }
+}
+
+function _updateTunnelBadge() {
+  const badge = document.getElementById('tunnel-badge');
+  const label = document.getElementById('tunnel-badge-label');
+  if (!badge || !label) return;
+  if (tunnelRunning && tunnelUrl) {
+    label.textContent = 'ON';
+    badge.classList.add('active');
+  } else {
+    label.textContent = 'OFF';
+    badge.classList.remove('active');
+  }
+}
+
+function openTunnelSheet() {
+  loadTunnel().then(_refreshTunnelSheet);
+  document.getElementById('tunnel-overlay')?.classList.add('open');
+  document.getElementById('tunnel-sheet')?.classList.add('open');
+}
+
+function closeTunnelSheet() {
+  document.getElementById('tunnel-overlay')?.classList.remove('open');
+  document.getElementById('tunnel-sheet')?.classList.remove('open');
+  if (tunnelStartPolling) { clearInterval(tunnelStartPolling); tunnelStartPolling = null; }
+}
+
+function _refreshTunnelSheet() {
+  const dot  = document.getElementById('tunnel-dot');
+  const txt  = document.getElementById('tunnel-url-text');
+  const copy = document.getElementById('tunnel-copy-btn');
+  const start= document.getElementById('tunnel-start-btn');
+  const stop = document.getElementById('tunnel-stop-btn');
+  if (!dot) return;
+  if (tunnelRunning && tunnelUrl) {
+    dot.className = 'tunnel-dot active';
+    txt.textContent = tunnelUrl;
+    if (copy)  copy.style.display = '';
+    if (start) start.style.display = 'none';
+    // External tunnels can't be stopped from A0
+    if (stop)  stop.style.display = tunnelExternal ? 'none' : '';
+  } else {
+    dot.className = 'tunnel-dot';
+    txt.textContent = 'Tunnel is not running';
+    if (copy)  copy.style.display = 'none';
+    if (start) start.style.display = '';
+    if (stop)  stop.style.display = 'none';
+  }
+}
+
+async function startTunnel() {
+  const txt = document.getElementById('tunnel-url-text');
+  if (txt) txt.textContent = 'Starting...';
+  document.getElementById('tunnel-start-btn').style.display = 'none';
+  try {
+    await api('/api/tunnel', { method: 'POST', body: { action: 'create', provider: 'cloudflared' } });
+  } catch (_) {}
+  let attempts = 0;
+  tunnelStartPolling = setInterval(async () => {
+    attempts++;
+    await loadTunnel();
+    _refreshTunnelSheet();
+    if (tunnelRunning && tunnelUrl) {
+      clearInterval(tunnelStartPolling); tunnelStartPolling = null;
+      showToast('Tunnel started \u2713', true);
+    } else if (attempts >= 15) {
+      clearInterval(tunnelStartPolling); tunnelStartPolling = null;
+      if (txt) txt.textContent = 'Tunnel failed to start. Check Cloudflare credentials.';
+      document.getElementById('tunnel-start-btn').style.display = '';
+    }
+  }, 2000);
+}
+
+async function stopTunnel() {
+  WebApp?.showConfirm('Stop the Cloudflare tunnel?', async (ok) => {
+    if (!ok) return;
+    try {
+      await api('/api/tunnel', { method: 'POST', body: { action: 'stop' } });
+      tunnelRunning = false; tunnelUrl = null;
+      _updateTunnelBadge();
+      _refreshTunnelSheet();
+      showToast('Tunnel stopped', true);
+    } catch (e) { showToast('Failed to stop tunnel', false); }
+  });
+}
+
+async function copyTunnelUrl() {
+  if (!tunnelUrl) return;
+  try {
+    await navigator.clipboard.writeText(tunnelUrl);
+  } catch (_) {
+    prompt('Copy this URL:', tunnelUrl);
+  }
+  showToast('URL copied \u2713', true);
+  WebApp?.HapticFeedback?.impactOccurred('light');
+}
+
+// ─── SHELL TAB ───────────────────────────────────────────────────────────────
+let shellHistory    = [];   // command history, max 50
+let shellHistoryIdx = -1;   // current position (-1 = not navigating)
+const SHELL_MAX_LINES = 500;
+let shellLineCount = 0;
+
+function _appendShellLine(text, cls = '') {
+  const out = document.getElementById('shell-output');
+  if (!out) return;
+  // Trim oldest lines over limit
+  if (shellLineCount >= SHELL_MAX_LINES) {
+    const first = out.querySelector('.shell-line');
+    if (first) first.remove();
+  } else {
+    shellLineCount++;
+  }
+  const span = document.createElement('span');
+  span.className = 'shell-line' + (cls ? ' ' + cls : '');
+  span.textContent = text;
+  out.appendChild(span);
+  out.appendChild(document.createTextNode('\n'));
+  out.scrollTop = out.scrollHeight;
+}
+
+function appendShellOutput(stdout, stderr, exitCode) {
+  if (stdout) stdout.split('\n').forEach(l => { if (l !== '') _appendShellLine(l); });
+  if (stderr) stderr.split('\n').forEach(l => { if (l !== '') _appendShellLine(l, 'stderr'); });
+  if (exitCode !== 0) _appendShellLine(`exit ${exitCode}`, 'exit-err');
+}
+
+function clearShell() {
+  const out = document.getElementById('shell-output');
+  if (!out) return;
+  out.innerHTML = '<span class="shell-welcome">Agent Zero Shell v0.1 — direct access to the Docker container</span>\n';
+  shellLineCount = 0;
+}
+
+function scrollShellToBottom() {
+  const out = document.getElementById('shell-output');
+  if (out) out.scrollTop = out.scrollHeight;
+}
+
+async function runShell(cmdArg) {
+  const input = document.getElementById('shell-input');
+  const cmd = (cmdArg !== undefined ? cmdArg : input?.value || '').trim();
+  if (!cmd) return;
+  if (input) input.value = '';
+
+  // Echo the command
+  _appendShellLine('$ ' + cmd, 'cmd');
+
+  // Save to history (skip duplicates at top)
+  if (!shellHistory.length || shellHistory[0] !== cmd) {
+    shellHistory.unshift(cmd);
+    if (shellHistory.length > 50) shellHistory.pop();
+  }
+  shellHistoryIdx = -1;
+
+  // Loading indicator
+  _appendShellLine('...', 'meta');
+  const loadingLine = document.getElementById('shell-output')?.lastElementChild?.previousElementSibling;
+
+  try {
+    const data = await api('/api/plugins/_miniapp/shell', { method: 'POST', body: { cmd } });
+    // Remove loading line
+    if (loadingLine && loadingLine.textContent === '...') {
+      loadingLine.nextSibling?.remove(); // newline
+      loadingLine.remove();
+    }
+    if (data?.error) {
+      _appendShellLine(data.error, data.exit_code === -1 ? 'exit-err' : 'stderr');
+    } else {
+      appendShellOutput(data?.stdout || '', data?.stderr || '', data?.exit_code ?? 0);
+      if (data?.duration_ms !== undefined) {
+        _appendShellLine(`[${data.duration_ms}ms]`, 'meta');
+      }
+    }
+  } catch (e) {
+    if (loadingLine && loadingLine.textContent === '...') {
+      loadingLine.nextSibling?.remove();
+      loadingLine.remove();
+    }
+    _appendShellLine(e.message || 'Request failed', 'exit-err');
+  }
+
+  scrollShellToBottom();
+  input?.focus();
+}
+
+function shellKeydown(e) {
+  const input = document.getElementById('shell-input');
+  if (!input) return;
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    runShell();
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    if (shellHistory.length) {
+      shellHistoryIdx = Math.min(shellHistoryIdx + 1, shellHistory.length - 1);
+      input.value = shellHistory[shellHistoryIdx] || '';
+      // Move cursor to end
+      setTimeout(() => input.setSelectionRange(input.value.length, input.value.length), 0);
+    }
+  } else if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    if (shellHistoryIdx > 0) {
+      shellHistoryIdx--;
+      input.value = shellHistory[shellHistoryIdx] || '';
+    } else {
+      shellHistoryIdx = -1;
+      input.value = '';
+    }
+  }
+}
+
+// ─── INIT ────────────────────────────────────────────────────────────────────
+(async function init() {
+  if (WebApp) {
+    WebApp.ready();
+    WebApp.expand();
+  }
+
+  // ── Keyboard: push shell input above keyboard on mobile ──────────────────
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', () => {
+      const offset = window.innerHeight - window.visualViewport.height;
+      const bar = document.querySelector('.shell-input-bar');
+      if (bar) {
+        bar.style.paddingBottom = offset > 60
+          ? (offset + 8) + 'px'
+          : '';
+      }
+    });
+  }
+
+  // Must be inside Telegram to use initData auth
+  const isTelegram = !!(WebApp?.initData);
+  if (!isTelegram) {
+    showTgGate();
+    return;
+  }
+
+  setLoading('Connecting…');
+
+  // Try to restore saved config
+  const cfg = await loadConfig();
+
+  if (!cfg || !cfg.baseUrl) {
+    // First run — show setup screen
+    showSetup();
+    return;
+  }
+
+  // Config exists — test connection, then re-run handshake (token may have changed)
+  setLoading('Checking connection…');
+  const health = await testConnection(cfg.baseUrl);
+  if (!health.ok) {
+    showSetup('Lost connection to Agent Zero. ' + health.error);
+    return;
+  }
+
+  setLoading('Authenticating…');
+  const hs = await doHandshake();
+  if (!hs.ok) {
+    // Auth failed — may just need a fresh token; show setup with prefilled URL
+    urlInput.value = cfg.baseUrl;
+    connectBtn.disabled = false;
+    showSetup(hs.error);
+    return;
+  }
+
+  // Refresh stored api_key in case it changed
+  await saveConfig(cfg.baseUrl, hs.api_key);
+  await bootstrapCsrf();
+  setConnDot('online');
+  showApp();
+  connectSocket();
+  loadTunnel();
+  document.getElementById('feed-messages')?.addEventListener('scroll', () => scrollFeed(false));
+})();
+</script>
+</body>
+</html>
