@@ -1,15 +1,27 @@
 <p align="center">
-  <img src="Screenshots/thumbnail.png" alt="Agent Zero Telegram Mini App" width="200">
+  <img src="Screenshots/thumbnail.png" alt="Agent Zero Telegram Mini App" width="160">
 </p>
 
-# Agent Zero Telegram Mini App
+<h1 align="center">Agent Zero Telegram Mini App</h1>
 
-> Your Agent Zero control panel, inside Telegram. Chat, monitor, configure, shell in — no browser needed.
+<p align="center">
+  <em>Your Agent Zero control panel, inside Telegram. Chat, monitor, configure, shell in — no browser needed.</em>
+</p>
 
-![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Agent Zero](https://img.shields.io/badge/agent--zero-compatible-green.svg)
-![Platform](https://img.shields.io/badge/platform-Telegram%20Mini%20App-2CA5E0.svg)
-![Build](https://img.shields.io/badge/build-none%20%28single%20file%29-lightgrey.svg)
+<p align="center">
+  <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License">
+  <img src="https://img.shields.io/badge/agent--zero-compatible-green.svg" alt="Agent Zero">
+  <img src="https://img.shields.io/badge/platform-Telegram%20Mini%20App-2CA5E0.svg" alt="Platform">
+  <img src="https://img.shields.io/badge/build-none%20%28single%20file%29-lightgrey.svg" alt="Build">
+</p>
+
+---
+
+<p align="center">
+  <img src="Screenshots/CleanShot%202026-04-13%20at%2002.56.35%402x.png" alt="Chat view" width="270">
+  <img src="Screenshots/CleanShot%202026-04-13%20at%2003.28.40%402x.png" alt="Activity feed" width="270">
+  <img src="Screenshots/CleanShot%202026-04-13%20at%2003.29.24%402x.png" alt="Shell access" width="270">
+</p>
 
 ---
 
@@ -147,16 +159,6 @@ Open your bot and tap the menu button. Done.
 | CORS error / app won't load | Add `https://web.telegram.org` to `ALLOWED_ORIGINS` in `usr/.env` |
 | "Open from Telegram" message | Must be opened inside Telegram — `initData` doesn't exist in regular browsers |
 | Shell returns "Shell not available" | Confirm plugin is in `usr/plugins/_miniapp/` and restart A0 |
-
----
-
-## Screenshots
-
-<p align="center">
-  <img src="Screenshots/CleanShot%202026-04-13%20at%2002.56.35%402x.png" alt="Chat view" width="300">
-  <img src="Screenshots/CleanShot%202026-04-13%20at%2003.28.40%402x.png" alt="Activity feed" width="300">
-  <img src="Screenshots/CleanShot%202026-04-13%20at%2003.29.24%402x.png" alt="Shell access" width="300">
-</p>
 
 ---
 
