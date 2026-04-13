@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="Screenshots/thumbnail.png" alt="Agent Zero Telegram Mini App" width="200">
+</p>
+
 # Agent Zero Telegram Mini App
 
 > Your Agent Zero control panel, inside Telegram. Chat, monitor, configure, shell in — no browser needed.
@@ -52,8 +56,7 @@ Telegram signs initData with your bot token
 ## Plugin Structure
 
 ```
-a0-plugin/
-└── _miniapp/
+_miniapp/
     ├── plugin.yaml           # Plugin metadata + registration
     ├── default_config.yaml   # Shell timeout, require_auth, allowed_users
     ├── api/
@@ -83,7 +86,7 @@ a0-plugin/
 **1. Drop in the plugin**
 
 ```bash
-cp -r a0-plugin/_miniapp /path/to/agent-zero/usr/plugins/
+cp -r _miniapp /path/to/agent-zero/usr/plugins/
 ```
 
 **2. Allow Telegram's origin**
@@ -147,11 +150,21 @@ Open your bot and tap the menu button. Done.
 
 ---
 
+## Screenshots
+
+<p align="center">
+  <img src="Screenshots/CleanShot%202026-04-13%20at%2002.56.35%402x.png" alt="Chat view" width="300">
+  <img src="Screenshots/CleanShot%202026-04-13%20at%2003.28.40%402x.png" alt="Activity feed" width="300">
+  <img src="Screenshots/CleanShot%202026-04-13%20at%2003.29.24%402x.png" alt="Shell access" width="300">
+</p>
+
+---
+
 ## Contributing
 
-PRs welcome. The entire frontend is `a0-plugin/_miniapp/webui/index.html` — a single-file SPA with no build step. Edit it directly.
+PRs welcome. The entire frontend is `_miniapp/webui/index.html` — a single-file SPA with no build step. Edit it directly.
 
-For backend changes, each API endpoint is a self-contained Python file in `a0-plugin/_miniapp/api/`.
+For backend changes, each API endpoint is a self-contained Python file in `_miniapp/api/`.
 
 1. Fork the repo
 2. Make your changes

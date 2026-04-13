@@ -14,13 +14,15 @@ Telegram Mini App for Agent Zero — a terminal-style chat interface running ins
 ## Directory Structure
 ```
 Agent0TelegramApp/
-├── Reference/
-│   └── hermes-telegram-miniapp/   # Reference SPA to adapt from
-│       ├── index.html             # Entire app — ~75KB single file
-│       ├── .env.example           # Required env vars template
-│       ├── systemd/               # Production service template
-│       ├── tunnel/                # Cloudflare tunnel config template
-│       └── README.md              # Full setup guide
+├── _miniapp/                      # A0 plugin (drop into usr/plugins/)
+│   ├── plugin.yaml                # Plugin metadata
+│   ├── default_config.yaml        # Shell timeout, auth settings
+│   ├── api/                       # Backend API handlers
+│   └── webui/                     # Frontend (index.html + config.html)
+├── index.html                     # Standalone SPA (dev/reference)
+├── index.yaml                     # a0-plugins registry entry
+├── Screenshots/                   # App screenshots + thumbnail
+└── Reference/                     # Original hermes-telegram-miniapp
 ```
 
 ## Conventions (from reference implementation)
@@ -34,17 +36,18 @@ Agent0TelegramApp/
 - **Test structure**: none
 
 ## Commands
-- Install: `cp Reference/hermes-telegram-miniapp/index.html ~/.hermes/miniapp/index.html`
-- Dev: `hermes gateway run` (backend gateway, port 8642)
+- Install: `cp -r _miniapp /path/to/agent-zero/usr/plugins/`
+- Dev: Agent Zero with `_telegram_integration` plugin enabled
 - Build: none (single file, no build step)
 - Test: none
 - Lint: none
 
 ## Key Files
-- Entry point: `Reference/hermes-telegram-miniapp/index.html`
-- Env config: `Reference/hermes-telegram-miniapp/.env.example`
-- Systemd service: `Reference/hermes-telegram-miniapp/systemd/hermes-gateway.service`
-- Tunnel config: `Reference/hermes-telegram-miniapp/tunnel/cloudflared-config.yml`
+- Plugin entry: `_miniapp/plugin.yaml`
+- Frontend: `_miniapp/webui/index.html`
+- Auth API: `_miniapp/api/auth.py`
+- Shell API: `_miniapp/api/shell.py`
+- Standalone SPA: `index.html`
 
 ## API Endpoints (Gateway — port 8642)
 - `GET /health` — CPU/mem/disk/uptime (no auth)

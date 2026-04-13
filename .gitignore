@@ -19,3 +19,10 @@ a0-data/
 
 # Node (if any tooling is added later)
 node_modules/
+
+# AI session files (internal, not public)
+.rune/
+.pytest_cache/
+
+# Tests (internal development only)
+tests/
