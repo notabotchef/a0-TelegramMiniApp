@@ -114,7 +114,8 @@ body {
   background: var(--accent);
   border-radius: 1px;
 }
-.tab-icon { font-size: 18px; line-height: 1; }
+.tab-icon { display: block; width: 22px; height: 22px; line-height: 1; }
+.tab-icon svg { display: block; width: 100%; height: 100%; }
 .tab-label { font-size: 9px; font-weight: 600; letter-spacing: .3px; text-transform: uppercase; }
 
 /* ─── PANELS ─────────────────────────────────────────────────────────────── */
@@ -576,7 +577,8 @@ body {
   width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
   background: var(--hint);
 }
-.tunnel-dot.active { background: var(--accent); animation: pulse 2s infinite; }
+.tunnel-dot.active   { background: var(--accent); animation: pulse 2s infinite; }
+.tunnel-dot.external { background: #f59e0b; }
 .tunnel-url-text { font-size: 12px; color: var(--text); font-family: monospace; word-break: break-all; }
 .sheet-actions { display: flex; gap: 8px; margin-bottom: 12px; }
 .sheet-btn {
@@ -876,19 +878,19 @@ body {
 <!-- ─── TAB BAR ───────────────────────────────────────────────────────────── -->
 <div id="tab-bar">
   <button class="tab-btn active" data-tab="feed"   onclick="switchTab('feed')">
-    <span class="tab-icon">⚡</span>
+    <span class="tab-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></span>
     <span class="tab-label">Feed</span>
   </button>
   <button class="tab-btn"        data-tab="config" onclick="switchTab('config')">
-    <span class="tab-icon">⚙️</span>
+    <span class="tab-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="8" x2="20" y2="8"/><line x1="4" y1="16" x2="20" y2="16"/><circle cx="9" cy="8" r="2.5"/><circle cx="15" cy="16" r="2.5"/></svg></span>
     <span class="tab-label">Config</span>
   </button>
   <button class="tab-btn"        data-tab="manage" onclick="switchTab('manage')">
-    <span class="tab-icon">💬</span>
+    <span class="tab-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
     <span class="tab-label">Manage</span>
   </button>
   <button class="tab-btn"        data-tab="shell"  onclick="switchTab('shell')">
-    <span class="tab-icon">&gt;_</span>
+    <span class="tab-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><polyline points="7 15 10 12 7 9"/><line x1="13" y1="15" x2="17" y2="15"/></svg></span>
     <span class="tab-label">Shell</span>
   </button>
 </div>
@@ -1150,9 +1152,15 @@ function fetchWithTimeout(url, opts = {}, timeoutMs = 15000) {
 
 // Bootstrap CSRF session with A0 — call once after successful auth.
 // A0 requires X-CSRF-Token on all POST endpoints (standard Flask CSRF protection).
+// credentials:'include' ensures the Flask session cookie is sent on cross-origin
+// requests so subsequent CSRF-protected calls succeed.
 async function bootstrapCsrf() {
   try {
-    const r = await fetchWithTimeout(baseUrl + '/api/csrf_token', {}, 6000);
+    const r = await fetchWithTimeout(
+      baseUrl + '/api/csrf_token',
+      { credentials: 'include' },
+      6000
+    );
     if (r.ok) {
       const data = await r.json().catch(() => ({}));
       if (data.ok && data.token) csrfToken = data.token;
@@ -1225,9 +1233,10 @@ async function api(path, opts = {}) {
   const r = await fetchWithTimeout(
     baseUrl + path,
     {
-      method:  opts.method || 'POST',
+      method:      opts.method || 'POST',
       headers,
-      body:    opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
+      body:        opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
+      credentials: 'include',
     },
     opts.timeout || 15000
   );
@@ -1729,14 +1738,13 @@ async function loadTunnel() {
   try {
     const data = await api('/api/tunnel', { method: 'POST', body: { action: 'get' } });
     tunnelUrl     = data?.tunnel_url || null;
-    tunnelRunning = !!data?.is_running;
+    tunnelRunning  = !!data?.is_running;
     tunnelExternal = false;
-    // If A0 doesn't manage this tunnel but we're clearly behind one
-    // (baseUrl is not localhost), the tunnel IS the URL we're using.
+    // If A0 doesn't manage this tunnel but baseUrl is a public host,
+    // mark as external info — don't pretend A0 started it.
     if (!tunnelRunning && baseUrl && !/localhost|127\.0\.0\.1|0\.0\.0\.0/.test(baseUrl)) {
       tunnelUrl      = baseUrl;
-      tunnelRunning  = true;
-      tunnelExternal = true;
+      tunnelExternal = true;  // show as external info, tunnelRunning stays false
     }
     _updateTunnelBadge();
   } catch (_) { /* tunnel endpoint may not be reachable — silent */ }
@@ -1746,8 +1754,8 @@ function _updateTunnelBadge() {
   const badge = document.getElementById('tunnel-badge');
   const label = document.getElementById('tunnel-badge-label');
   if (!badge || !label) return;
-  if (tunnelRunning && tunnelUrl) {
-    label.textContent = 'ON';
+  if ((tunnelRunning || tunnelExternal) && tunnelUrl) {
+    label.textContent = tunnelExternal ? 'EXT' : 'ON';
     badge.classList.add('active');
   } else {
     label.textContent = 'OFF';
@@ -1779,8 +1787,14 @@ function _refreshTunnelSheet() {
     txt.textContent = tunnelUrl;
     if (copy)  copy.style.display = '';
     if (start) start.style.display = 'none';
-    // External tunnels can't be stopped from A0
-    if (stop)  stop.style.display = tunnelExternal ? 'none' : '';
+    if (stop)  stop.style.display = '';
+  } else if (tunnelExternal && tunnelUrl) {
+    // External tunnel (not managed by A0) — show URL as info, keep Start button visible
+    dot.className = 'tunnel-dot external';
+    txt.textContent = tunnelUrl + ' (external)';
+    if (copy)  copy.style.display = '';
+    if (start) start.style.display = '';
+    if (stop)  stop.style.display = 'none';
   } else {
     dot.className = 'tunnel-dot';
     txt.textContent = 'Tunnel is not running';
