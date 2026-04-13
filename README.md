@@ -9,7 +9,7 @@ A control panel for [Agent Zero](https://github.com/frdel/agent-zero) — right 
 | ⚡ Feed | Real-time Socket.IO activity stream — tool calls, thoughts, steps |
 | ⚙️ Config | LLM model switcher, plugin toggle cards, reset/nudge |
 | 💬 Manage | Chat list, scheduler tasks, Cloudflare tunnel widget |
-| >_ Shell | Direct shell into the Docker container |
+| >_ Shell | Direct shell into the A0 container |
 
 ## Install (you already have A0 running)
 
@@ -20,8 +20,6 @@ This is a plugin. Drop it in and it works — no build step, no extra config.
 ```bash
 cp -r a0-plugin/_miniapp /path/to/agent-zero/usr/plugins/
 ```
-
-> `a0-plugin/_miniapp/webui/index.html` is the Mini App frontend — it's included in the plugin directory.
 
 **Step 2 — Allow Telegram's origin**
 
@@ -52,7 +50,7 @@ That's it. Open your bot and tap the menu button.
 
 ## Prerequisites
 
-- Agent Zero running (Docker recommended)
+- Agent Zero running
 - `_telegram_integration` plugin enabled in A0 settings with a bot token
 - A public HTTPS URL for your A0 instance (A0's built-in tunnel, cloudflared, or ngrok)
 
@@ -92,7 +90,7 @@ Direct bash access to the `/a0` directory in the container.
 
 **Blocked commands:** `rm -rf /`, fork bombs, `mkfs`, `dd if=`, `shutdown`, `reboot`, `halt`, `poweroff`.
 
-Timeout: **30 seconds**. Output cap: **50 KB**.
+Timeout and output cap are configurable in A0 → Settings → Plugins → _miniapp.
 
 ## Troubleshooting
 
@@ -104,7 +102,7 @@ Timeout: **30 seconds**. Output cap: **50 KB**.
 | 403 "user not authorized" | Add your Telegram user ID to `allowed_users` in `_telegram_integration` config |
 | App won't load / CORS error | Add `https://web.telegram.org` to `ALLOWED_ORIGINS` in `usr/.env` |
 | "Open from Telegram" message | Must be opened inside Telegram's built-in browser — `initData` doesn't exist in regular browsers |
-| Shell returns "Shell not available" | Plugin volume mount not working — verify the plugin is in `usr/plugins/_miniapp/` and restart |
+| Shell returns "Shell not available" | Verify the plugin is in `usr/plugins/_miniapp/` and restart A0 |
 
 ## File Structure
 
@@ -114,28 +112,19 @@ a0-TelegramMiniApp/
 ├── a0-plugin/
 │   └── _miniapp/
 │       ├── plugin.yaml          # Plugin metadata
-│       ├── default_config.yaml  # Plugin config template
+│       ├── default_config.yaml  # Plugin config (shell timeout, require_auth, etc.)
 │       ├── api/
-│       │   ├── auth.py          # initData → api_key (no auth required)
-│       │   └── shell.py         # Shell endpoint (requires X-API-KEY)
+│       │   ├── auth.py          # initData → api_key
+│       │   ├── shell.py         # Shell endpoint (requires X-API-KEY)
+│       │   ├── contexts_list.py # Chat list endpoint
+│       │   ├── presets.py       # LLM preset list endpoint
+│       │   └── reset.py         # Agent reset endpoint
 │       └── webui/
-│           └── index.html       # Same file — served at /usr/plugins/_miniapp/webui/
-├── tests/
-│   └── test_shell.py            # pytest tests for shell.py (19 tests)
-└── docker-compose.example.yml   # Only needed if starting A0 from scratch
+│           ├── index.html       # Mini App frontend (served at /usr/plugins/_miniapp/webui/)
+│           └── config.html      # Plugin config UI for A0 Settings
+└── tests/
+    └── test_shell.py            # pytest tests for shell.py
 ```
-
-## Fresh Install (starting from scratch)
-
-If you don't have A0 running yet:
-
-```bash
-cp docker-compose.example.yml docker-compose.yml
-# Edit docker-compose.yml — set ALLOWED_ORIGINS and your API keys
-docker-compose up -d
-```
-
-Then follow the 3-step install above.
 
 ## Security
 
