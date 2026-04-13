@@ -6,4 +6,4 @@ settings_sections:
   - external
 per_project_config: false
 per_agent_config: false
-always_enabled: false
+always_enabled: true
